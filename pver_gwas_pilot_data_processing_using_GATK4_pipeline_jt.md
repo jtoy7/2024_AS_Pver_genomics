@@ -776,7 +776,7 @@ Example summary table:
 
  
 
-## 8. Base quality score recalibration (BQSR):
+## 8. Base quality score recalibration (BQSR): **OPTIONAL - SKIP FOR NOW**
 
 This step is performed per-sample and consists of applying machine
 learning to detect and correct for patterns of systematic errors in the
