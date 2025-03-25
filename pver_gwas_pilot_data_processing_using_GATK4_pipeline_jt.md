@@ -709,7 +709,7 @@ for (FILE in file_list) {
 Example depth histogram:  
 
 VATI_PVER_21
-![](C:/Users/jason/OneDrive/Documents/odu/projects/global_search_genomics/pver_gwas/2024_VATI_Pver_21_1_227H3WLT4-L008_coverage_hist.png)
+![](2024_VATI_Pver_21_1_227H3WLT4-L008_coverage_hist.png)
 
 Example summary table:
 
