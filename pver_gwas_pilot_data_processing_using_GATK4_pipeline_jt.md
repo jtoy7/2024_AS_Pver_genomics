@@ -1,4 +1,4 @@
-GATK4 Pipeline
+Processing of 2024 P. verrucosa WGS data from American Samoa using GATK4 tools and best practices
 ================
 Jason Toy
 2024-08-08
