@@ -709,7 +709,7 @@ for (FILE in file_list) {
 Example depth histogram:  
 
 VATI_PVER_21
-![](./2024_VATI_Pver_21_1_227H3WLT4-L008_coverage_hist.pdf)
+![VATI_PVER_21](./2024_VATI_Pver_21_1_227H3WLT4-L008_coverage_hist.pdf)
 
 Example summary table:
 
