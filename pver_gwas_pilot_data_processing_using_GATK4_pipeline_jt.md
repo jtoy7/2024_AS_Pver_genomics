@@ -653,7 +653,6 @@ for FILE in `ls *nonzero.txt`; do
 done
 ```
 
-    ## ls: cannot access '*nonzero.txt': No such file or directory
 
  
 
