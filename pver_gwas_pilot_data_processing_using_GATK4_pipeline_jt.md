@@ -813,12 +813,12 @@ First index the P. verrucosa reference fasta:
 
     cd /cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1
     
-    crun.samtools samtools faidx GCF_036669915.1_ASM3666991v2_genomic.fna
+    crun.samtools samtools faidx GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
 
 
     module load gatk
     GATK='crun.gatk gatk'
-    $GATK --java-options "-Xmx100G" CreateSequenceDictionary --REFERENCE GCF_036669915.1_ASM3666991v2_genomic.fna
+    $GATK --java-options "-Xmx100G" CreateSequenceDictionary --REFERENCE GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
          
 
 
@@ -908,7 +908,7 @@ module load container_env gatk
 BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
 BAMLIST=$BASEDIR/pver_gwas_pilot/sample_lists/pver_bams_list.txt
 GATK='crun.gatk gatk'
-REFERENCE=$BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genomic.fna
+REFERENCE=$BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
 
 ## Get sample BAM filename
 SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $BAMLIST)
@@ -928,9 +928,9 @@ fi
 
 ## Run HaplotypeCaller
 $GATK --java-options "-Xmx100G" HaplotypeCaller \
-  -I "$BAMFILE" \
-  -O "$BASEDIR/pver_gwas_pilot/gvcfs/${SAMPLEBAM%.*}.g.vcf.gz" \
-  -R "$REFERENCE" \
+  -I $BAMFILE \
+  -O $BASEDIR'/pver_gwas_pilot/gvcfs/'${SAMPLEBAM%.*}'.g.vcf.gz' \
+  -R $REFERENCE \
   -ERC GVCF
 
 echo "done-zo woot!"
