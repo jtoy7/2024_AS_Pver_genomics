@@ -877,12 +877,63 @@ $GATK --java-options "-Xmx100G" BuildBamIndex \
 
 ## Run HaplotypeCaller
 $GATK --java-options "-Xmx100G" HaplotypeCaller \
-  --INPUT $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'$SAMPLEBAM \
-  --OUTPUT $BASEDIR'/pver_gwas_pilot/gvcfs/'${SAMPLEBAM%.*}'.g.vcf.gz' \
-  --REFERENCE_SEQUENCE $REFERENCE \
+  -I $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'$SAMPLEBAM \
+  -O $BASEDIR'/pver_gwas_pilot/gvcfs/'${SAMPLEBAM%.*}'.g.vcf.gz' \
+  -R $REFERENCE \
   -ERC GVCF
 
 echo 'done-zo woot!'
+```
+
+
+This version of the script can be used to check to see if .bai index files already exist before running BuildBamIndex:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name HaplotypeCaller_array_pver_2025-03-26
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-16%16
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=20
+
+## Load modules
+module load container_env gatk
+
+BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
+BAMLIST=$BASEDIR/pver_gwas_pilot/sample_lists/pver_bams_list.txt
+GATK='crun.gatk gatk'
+REFERENCE=$BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genomic.fna
+
+## Get sample BAM filename
+SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $BAMLIST)
+BAMFILE=$BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/$SAMPLEBAM
+BAIFILE=${BAMFILE%.*}.bai
+
+echo "Slurm array task ID: $SLURM_ARRAY_TASK_ID"
+echo "Sample BAM: $SAMPLEBAM"
+
+## Check if BAM index exists, and create it if missing
+if [[ ! -f "$BAIFILE" ]]; then
+  echo "Index file $BAIFILE not found. Creating index..."
+  $GATK --java-options "-Xmx100G" BuildBamIndex --INPUT "$BAMFILE"
+else
+  echo "Index file $BAIFILE already exists. Skipping indexing."
+fi
+
+## Run HaplotypeCaller
+$GATK --java-options "-Xmx100G" HaplotypeCaller \
+  -I "$BAMFILE" \
+  -O "$BASEDIR/pver_gwas_pilot/gvcfs/${SAMPLEBAM%.*}.g.vcf.gz" \
+  -R "$REFERENCE" \
+  -ERC GVCF
+
+echo "done-zo woot!"
 ```
 
 
