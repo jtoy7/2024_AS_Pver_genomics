@@ -804,6 +804,7 @@ From the GATK Documentation:
   data. These steps could be repeated several times until convergence.”
 
 
+
 ## 9. Call variants per sample with HaplotypeCaller (in GVCF mode)
 
 
