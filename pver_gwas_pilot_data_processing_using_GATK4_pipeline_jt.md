@@ -806,13 +806,6 @@ From the GATK Documentation:
 
 ## 9. Call variants per sample with HaplotypeCaller (in GVCF mode)
 
-``` bash
-crun.gatk gatk HaplotypeCaller \
-    --INPUT $COORDINATE_SORTED_BAM_FILE \
-    --OUTPUT $GVCF_OUTPUT_FILE \
-    --REFERENCE_SEQUENCE $REFERENCE
-    -ERC GVCF
-```
 
 First index the P. verrucosa reference fasta:
 
@@ -827,14 +820,26 @@ First index the P. verrucosa reference fasta:
     GATK='crun.gatk gatk'
     $GATK --java-options "-Xmx100G" CreateSequenceDictionary --REFERENCE GCF_036669915.1_ASM3666991v2_genomic.fna
          
-    
+
+
+Basic usage:
+``` bash
+crun.gatk gatk HaplotypeCaller \
+    --INPUT $COORDINATE_SORTED_BAM_FILE \
+    --OUTPUT $GVCF_OUTPUT_FILE \
+    --REFERENCE_SEQUENCE $REFERENCE
+    -ERC GVCF
+
+# -ERC GVCF (--emit-ref-confidence)    Controls how variant calls and reference confidence values are emitted.
+#                                      Ensures that the output is a gVCF (Genomic VCF), which includes reference blocks for non-variant sites.
+```
 
 
 Array script for HaplotypeCaller:
 
 ``` bash
 #!/bin/bash
-#SBATCH --job-name CollectWgsMetrics_array_pver_only_nonzero_2024-08-12
+#SBATCH --job-name HaplotypeCaller_array_pver_2025-03-26
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
@@ -864,12 +869,18 @@ echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
 echo Sample bam is $SAMPLEBAM
 
 
-## Run CollectWgsMetrics
-$GATK --java-options "-Xmx100G" CollectWgsMetricsWithNonZeroCoverage \
+## Index BAM
+$GATK --java-options "-Xmx100G" BuildBamIndex \
+      --INPUT $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'$SAMPLEBAM \
+      --OUTPUT $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'${SAMPLEBAM%.*}'.bai'
+
+
+## Run HaplotypeCaller
+$GATK --java-options "-Xmx100G" HaplotypeCaller \
   --INPUT $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'$SAMPLEBAM \
-  --OUTPUT $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'${SAMPLEBAM%.*}'_metrics_nonzero.txt' \
-  --CHART $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'${SAMPLEBAM%.*}'_metrics_nonzero_chart.pdf' \
-  --REFERENCE_SEQUENCE $REFERENCE
+  --OUTPUT $BASEDIR'/pver_gwas_pilot/gvcfs/'${SAMPLEBAM%.*}'.g.vcf.gz' \
+  --REFERENCE_SEQUENCE $REFERENCE \
+  -ERC GVCF
 
 echo 'done-zo woot!'
 ```
