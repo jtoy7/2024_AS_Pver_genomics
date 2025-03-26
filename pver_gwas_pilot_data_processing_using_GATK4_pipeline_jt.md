@@ -776,7 +776,7 @@ Example summary table:
 
  
 
-## 8. Base quality score recalibration (BQSR): **OPTIONAL - SKIP FOR NOW**
+## 8. **OPTIONAL** - Base quality score recalibration (BQSR):  (**SKIP FOR NOW**)
 
 This step is performed per-sample and consists of applying machine
 learning to detect and correct for patterns of systematic errors in the
@@ -802,3 +802,82 @@ From the GATK Documentation:
   to the BaseRecalibrator.
 - Finally, do a real round of variant calling with the recalibrated
   data. These steps could be repeated several times until convergence.”
+
+
+## 9. Call variants per sample with HaplotypeCaller (in GVCF mode)
+
+``` bash
+crun.gatk gatk HaplotypeCaller \
+    --INPUT $COORDINATE_SORTED_BAM_FILE \
+    --OUTPUT $GVCF_OUTPUT_FILE \
+    --REFERENCE_SEQUENCE $REFERENCE
+    -ERC GVCF
+```
+
+First index the P. verrucosa reference fasta:
+
+    module load samtools
+
+    cd /cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1
+    
+    crun.samtools samtools faidx GCF_036669915.1_ASM3666991v2_genomic.fna
+
+
+    module load gatk
+    GATK='crun.gatk gatk'
+    $GATK --java-options "-Xmx100G" CreateSequenceDictionary --REFERENCE GCF_036669915.1_ASM3666991v2_genomic.fna
+         
+    
+
+
+Array script for HaplotypeCaller:
+
+``` bash
+#!/bin/bash
+#SBATCH --job-name CollectWgsMetrics_array_pver_only_nonzero_2024-08-12
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-16%16
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=20
+
+
+## Load modules
+module load container_env gatk
+
+BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
+BAMLIST=$BASEDIR/pver_gwas_pilot/sample_lists/pver_bams_list.txt
+GATK='crun.gatk gatk'
+REFERENCE=$BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genomic.fna
+
+
+## Loop over each sample
+# for SAMPLEBAM in `cat $BAMLIST`; do
+
+SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID},1p" $BAMLIST)
+echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
+echo Sample bam is $SAMPLEBAM
+
+
+## Run CollectWgsMetrics
+$GATK --java-options "-Xmx100G" CollectWgsMetricsWithNonZeroCoverage \
+  --INPUT $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'$SAMPLEBAM \
+  --OUTPUT $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'${SAMPLEBAM%.*}'_metrics_nonzero.txt' \
+  --CHART $BASEDIR'/pver_gwas_pilot/bam/dedup_bams2/pver_bams/'${SAMPLEBAM%.*}'_metrics_nonzero_chart.pdf' \
+  --REFERENCE_SEQUENCE $REFERENCE
+
+echo 'done-zo woot!'
+```
+
+
+## 10. Consolidate per sample GVCFs with GenomicsDBImport
+
+
+
+## 11. Joint genotyping with GenotypeGVCFs
+
