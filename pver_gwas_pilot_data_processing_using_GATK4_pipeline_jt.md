@@ -1,4 +1,4 @@
-Processing of 2024 P. verrucosa WGS data from American Samoa using GATK4 tools and best practices
+Processing of 2024 P. verrucosa WGS data from American Samoa using GATK4 tools and adapted best practices
 ================
 Jason Toy
 2024-08-08
@@ -932,7 +932,8 @@ $GATK --java-options "-Xmx100G" HaplotypeCaller \
   -I $BAMFILE \
   -O $BASEDIR'/pver_gwas_pilot/gvcfs/'${SAMPLEBAM%.*}'.g.vcf.gz' \
   -R $REFERENCE \
-  -ERC GVCF
+  -ERC GVCF \
+  --native-pair-hmm-threads 28
 
 echo "done-zo woot!"
 ```
@@ -940,7 +941,48 @@ echo "done-zo woot!"
 
 ## 10. Consolidate per sample GVCFs with GenomicsDBImport
 
+First need to create a tab-delimited map file with sample_name in the first column and /path/to/vcf in the second column:
 
+
+Basic usage:
+```bash
+    gatk --java-options "-Xmx4g -Xms4g" \
+       GenomicsDBImport \
+       --genomicsdb-workspace-path my_database \
+       --batch-size 50 \      # use if processing many samples simultaneously. Limits memory usage.
+       -L chr1:1000-10000 \
+       --sample-name-map cohort.sample_map \
+       --tmp-dir /path/to/large/tmp \    # can be used to specify an alternate temporary storage location with sufficient space if needed
+       --reader-threads 5
+```
+
+Slurm script:
+```bash
+#!/bin/bash
+#SBATCH --job-name GenomicsDBImport_pver_2025-03-26
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-16%16
+#SBATCH --ntasks=1
+#SBATCH --mem=120G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=16
+
+## Load modules
+module load container_env gatk
+
+BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
+GATK='crun.gatk gatk'
+
+gatk --java-options "-Xmx100g -Xms10g" \
+   GenomicsDBImport \
+   --genomicsdb-workspace-path $BASEDIR/pver_gwas_pilot/genomicsdb/ \
+   --sample-name-map pver_gwas_pilot_gvcf.sample_map \
+   --reader-threads 16
+```
 
 ## 11. Joint genotyping with GenotypeGVCFs
 
