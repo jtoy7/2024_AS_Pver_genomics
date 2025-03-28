@@ -1,7 +1,7 @@
 Processing of 2024 P. verrucosa WGS data from American Samoa using GATK4 tools and adapted best practices - Data Batch 2
 ================
-**AUTHOR:** Jason Toy
-**DATE:** 2025-03-27
+**AUTHOR:** Jason A. Toy  
+**DATE:** 2025-03-27 <br><br>
 
 ## Data Prep
 
