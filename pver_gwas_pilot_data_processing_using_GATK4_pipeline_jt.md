@@ -616,24 +616,24 @@ awk '{print $0, $2/$3}' \
     > "$BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/pver_read_percents.txt"
 ```
 
-| Sample | Post-processing_total_read_count | Post-processing_Pver_read_count | Percent_Pver_reads |
-| --- | --- | --- | --- |
-| 2024_VATI_Pver_21_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 193559589 | 391304080 | 0.494653 |
-| 2024_VATI_Pver_22_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 186626711 | 382997872 | 0.487279 |
-| 2024_VATI_Pver_23_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 167826399 | 342971808 | 0.48933 |
-| 2024_VATI_Pver_24_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 154342775 | 320073616 | 0.48221 |
-| 2024_VATI_Pver_25_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 130268414 | 271652826 | 0.47954 |
-| 2024_VATI_Pver_26_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 122646699 | 253683358 | 0.483464 |
-| 2024_VATI_Pver_27_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 126849038 | 261762888 | 0.484595 |
-| 2024_VATI_Pver_28_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 134053746 | 276011764 | 0.485681 |
-| 2024_VATI_Pver_29_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 155086527 | 325343822 | 0.476685 |
-| 2024_VATI_Pver_30_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 110833016 | 231446692 | 0.478871 |
-| 2024_VATI_Pver_31_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 143627384 | 299238960 | 0.479976 |
-| 2024_VATI_Pver_32_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 170350984 | 351492214 | 0.484651 |
-| 2024_VATI_Pver_33_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 81842347 | 168179902 | 0.486636 |
-| 2024_VATI_Pver_34_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 152873596 | 315951282 | 0.483852 |
-| 2024_VATI_Pver_35_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 77758059 | 160741570 | 0.483746 |
-| 2024_VATI_Pver_36_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver.bam | 79256376 | 165617090 | 0.478552 |
+| Sample                                                                                       | Post-processing_Pver_read_count_condordant_only | Post-processing_total_read_count | Percent_Pver_reads |
+|----------------------------------------------------------------------------------------------|-------------------------------------------------|----------------------------------|--------------------|
+| 2024_VATI_Pver_21_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 176042818                                       | 391304080                        | 0.449888           |
+| 2024_VATI_Pver_22_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 168635188                                       | 382997872                        | 0.440303           |
+| 2024_VATI_Pver_23_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 151224676                                       | 342971808                        | 0.440925           |
+| 2024_VATI_Pver_24_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 137435262                                       | 320073616                        | 0.429386           |
+| 2024_VATI_Pver_25_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 116004972                                       | 271652826                        | 0.427034           |
+| 2024_VATI_Pver_26_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 110263344                                       | 253683358                        | 0.434649           |
+| 2024_VATI_Pver_27_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 112565296                                       | 261762888                        | 0.430028           |
+| 2024_VATI_Pver_28_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 116284158                                       | 276011764                        | 0.421301           |
+| 2024_VATI_Pver_29_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 138842314                                       | 325343822                        | 0.426756           |
+| 2024_VATI_Pver_30_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 99908544                                        | 231446692                        | 0.43167            |
+| 2024_VATI_Pver_31_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 127183126                                       | 299238960                        | 0.425022           |
+| 2024_VATI_Pver_32_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 149764782                                       | 351492214                        | 0.426083           |
+| 2024_VATI_Pver_33_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 73224156                                        | 168179902                        | 0.435392           |
+| 2024_VATI_Pver_34_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 134343792                                       | 315951282                        | 0.425204           |
+| 2024_VATI_Pver_35_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 69922392                                        | 160741570                        | 0.434999           |
+| 2024_VATI_Pver_36_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 72196466                                        | 165617090                        | 0.435924           |
 
 
 
