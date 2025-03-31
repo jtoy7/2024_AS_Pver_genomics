@@ -537,9 +537,18 @@ module load container_env samtools
 #index sorted BAM
 crun.samtools samtools index -@ 20 $BASEDIR/pver_gwas_pilot/bam/dedup_bams2/$SAMPLEFILE
 
-# Extract mappings that are primary alignments only (no unmapped or secondary/supplementary reads), with mapping score > 20, mapping length (CIGAR) > 20, and only on host scaffolds
-crun.samtools samtools view -F 260 -q 20 -m 20 -@ 28 $BASEDIR/pver_gwas_pilot/bam/dedup_bams2/$SAMPLEFILE `cat $SCAFLIST` | grep -v "^@SQ.*Cgoreaui.*" | grep -v "^@SQ.*Dtrenchii.*" | crun.samtools samtools view -b -o $OUTDIR/$HOSTOUT
-    # edited this to remove header lines for sym contigs and reran on 2025-03-28
+# Extract mappings that are primary alignments only (no unmapped or secondary/supplementary reads), with mapping score > 20, mapping length (CIGAR) > 20, and only on host scaffolds. Then extract only reads that aligned concordantly (-f 2)
+crun.samtools samtools view -b -F 260 -q 20 -m 20 -@ 28 $BASEDIR/pver_gwas_pilot/bam/dedup_bams2/$SAMPLEFILE `cat $SCAFLIST` | crun.samtools samtools view -f 2 -b -o $OUTDIR/$HOSTOUT
+
+# Remove Cgoreaui and Dtrenchii sequence header lines, then reheader bam
+crun.samtools samtools view -H $OUTDIR/$HOSTOUT | sed -e '/Cgoreaui/d' -e '/Dtrenchii/d' > $OUTDIR/'header_'$SLURM_ARRAY_TASK_ID'.sam'
+
+crun.samtools samtools reheader $OUTDIR/'header_'$SLURM_ARRAY_TASK_ID'.sam' $OUTDIR/$HOSTOUT > $OUTDIR/${HOSTOUT%.*}'_reheadered.bam'
+
+# Remove original bam file
+rm $OUTDIR/$HOSTOUT
+
+    # edited this to remove header lines for sym contigs and reran on 2025-03-31
 ```
 
  
