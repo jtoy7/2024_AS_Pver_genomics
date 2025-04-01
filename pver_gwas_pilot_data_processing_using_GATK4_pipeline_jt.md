@@ -933,6 +933,7 @@ echo "Sample BAM: $SAMPLEBAM"
 ## Check if BAM index exists, and create it if missing
 if [[ ! -f "$BAIFILE" ]]; then
   echo "Index file $BAIFILE not found. Creating index..."
+  cd $BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/
   $GATK --java-options "-Xmx100G" BuildBamIndex --INPUT "$BAMFILE"
 else
   echo "Index file $BAIFILE already exists. Skipping indexing."
