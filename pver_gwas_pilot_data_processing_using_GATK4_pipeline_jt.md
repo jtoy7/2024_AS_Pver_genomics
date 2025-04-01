@@ -653,7 +653,7 @@ Array script for CollectWgsMetricsWithNonZeroCoverage:
 
 ``` bash
 #!/bin/bash
-#SBATCH --job-name CollectWgsMetrics_array_pver_only_nonzero_2024-08-12
+#SBATCH --job-name CollectWgsMetrics_pver_only_nonzero_array_2025-03-31
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
@@ -672,7 +672,7 @@ module load container_env gatk
 BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
 BAMLIST=$BASEDIR/pver_gwas_pilot/sample_lists/pver_bams_list.txt
 GATK='crun.gatk gatk'
-REFERENCE=$BASEDIR/references/genomes/combined_pver_cd_hologenome.fa
+REFERENCE=$BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
 
 
 ## Loop over each sample
@@ -892,6 +892,7 @@ $GATK --java-options "-Xmx100G" HaplotypeCaller \
   -O $BASEDIR'/pver_gwas_pilot/gvcfs/'${SAMPLEBAM%.*}'.g.vcf.gz' \
   -R $REFERENCE \
   -ERC GVCF
+  --native-pair-hmm-threads 28
 
 echo 'done-zo woot!'
 ```
