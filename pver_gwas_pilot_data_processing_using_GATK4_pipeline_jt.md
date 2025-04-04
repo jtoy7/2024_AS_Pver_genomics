@@ -971,17 +971,17 @@ Basic usage:
 Slurm script:
 ```bash
 #!/bin/bash
-#SBATCH --job-name GenomicsDBImport_pver_2025-03-26
+
+#SBATCH --job-name GenomicsDBImport_pver_2025-04-03
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
-#SBATCH --array=1-16%16
 #SBATCH --ntasks=1
 #SBATCH --mem=120G
 #SBATCH --time 5-00:00:00
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=38
 
 ## Load modules
 module load container_env gatk
@@ -989,12 +989,13 @@ module load container_env gatk
 BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
 GATK='crun.gatk gatk'
 
-gatk --java-options "-Xmx100g -Xms10g" \
+$GATK --java-options "-Xmx100g -Xms10g" \
    GenomicsDBImport \
    --genomicsdb-workspace-path $BASEDIR/pver_gwas_pilot/genomicsdb/ \
-   --sample-name-map pver_gwas_pilot_gvcf.sample_map \
-   --reader-threads 16
+   --sample-name-map $BASEDIR/pver_gwas_pilot/gvcfs/pver_gwas_pilot_gvcf.sample_map \
+   -L $BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list \
 ```
+Run time: 10.5 hrs
 
 ## 11. Joint genotyping with GenotypeGVCFs
 
