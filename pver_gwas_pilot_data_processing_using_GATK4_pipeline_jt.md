@@ -949,7 +949,7 @@ $GATK --java-options "-Xmx100G" HaplotypeCaller \
 
 echo "done-zo woot!"
 ```
-
+Run time: 21 hrs for the largest file
 
 ## 10. Consolidate per sample GVCFs with GenomicsDBImport
 
@@ -995,7 +995,35 @@ $GATK --java-options "-Xmx100g -Xms10g" \
    --sample-name-map $BASEDIR/pver_gwas_pilot/gvcfs/pver_gwas_pilot_gvcf.sample_map \
    -L $BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list \
 ```
-Run time: 10.5 hrs
+Run time: 10.5 hrs for 16 samples. The tools imports by scaffold. There are 52 and the largest scaffolds (chromosomes) took about 1 hr to import. Processing time for non-chromosome scaffolds was negligible.
 
 ## 11. Joint genotyping with GenotypeGVCFs
+ 
+ ```bash
+#!/bin/bash
 
+#SBATCH --job-name GenotypeGVCFs_pver_2025-04-07
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --ntasks=1
+#SBATCH --mem=120G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=38
+
+## Load modules
+module load container_env gatk
+
+BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
+REFERENCE=$BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
+OUTDIR=$BASEDIR/pver_gwas_pilot/vcf
+GATK='crun.gatk gatk'
+
+$GATK --java-options "-Xmx100g" GenotypeGVCFs \
+   -R $REFERENCE \
+   -V gendb:$BASEDIR/pver_gwas_pilot/genomicsdb/ \
+   -O $OUTDIR/pver_pilot_genotypes.vcf.gz \
+
+```
