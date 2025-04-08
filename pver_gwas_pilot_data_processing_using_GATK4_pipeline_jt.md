@@ -998,7 +998,10 @@ $GATK --java-options "-Xmx100g -Xms10g" \
 Run time: 10.5 hrs for 16 samples. The tools imports by scaffold. There are 52 and the largest scaffolds (chromosomes) took about 1 hr to import. Processing time for non-chromosome scaffolds was negligible.
 
 ## 11. Joint genotyping with GenotypeGVCFs
- 
+
+This step is parallelized by genomic region to speed up processing time, since GenotypeGVCFs doesn't have internal parallelization options.
+
+ `GenotypeGVCFs_array.slurm`
  ```bash
 #!/bin/bash
 
@@ -1008,10 +1011,11 @@ Run time: 10.5 hrs for 16 samples. The tools imports by scaffold. There are 52 a
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
+#SBATCH --array=1-52%52
 #SBATCH --ntasks=1
 #SBATCH --mem=120G
 #SBATCH --time 5-00:00:00
-#SBATCH --cpus-per-task=38
+#SBATCH --cpus-per-task=10
 
 ## Load modules
 module load container_env gatk
@@ -1019,11 +1023,19 @@ module load container_env gatk
 BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
 REFERENCE=$BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
 OUTDIR=$BASEDIR/pver_gwas_pilot/vcf
+GENDB=$BASEDIR/pver_gwas_pilot/genomicsdb
+SCAFLIST=$BASEDIR/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list
 GATK='crun.gatk gatk'
+
+
+SCAF=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $SCAFLIST)
+
+
+echo "Processing scaffold: $SCAF"
 
 $GATK --java-options "-Xmx100g" GenotypeGVCFs \
    -R $REFERENCE \
-   -V gendb:$BASEDIR/pver_gwas_pilot/genomicsdb/ \
-   -O $OUTDIR/pver_pilot_genotypes.vcf.gz \
-
+   -V gendb://$GENDB \
+   -L $SCAF \
+   -O $OUTDIR/$SCAF_'genotypes.vcf.gz' \
 ```
