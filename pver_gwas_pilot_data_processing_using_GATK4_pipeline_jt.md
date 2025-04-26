@@ -1039,3 +1039,142 @@ $GATK --java-options "-Xmx100g" GenotypeGVCFs \
    -L $SCAF \
    -O $OUTDIR/$SCAF_'genotypes.vcf.gz' \
 ```
+
+Once genotyping is complete, there will we a separate vcf for each sample. Combine them into a single multi-sample VCF with BCFtools:
+```bash
+# make list of vcf files
+ls *.vcf.gz | sort > vcf_list.txt
+
+
+# combine VCFs
+crun.bcftools bcftools concat -f vcf_list.txt --threads 34 -Ov -o pver_pilot_combined_genotypes.vcf
+```
+
+Now count the total number of called genotypes (variants):
+```bash
+grep -v "#" pver_pilot_combined_genotypes.vcf | wc -l
+```
+11,860,400 total SNPs
+
+
+## 12. Variant Filtering
+
+First we need to know a bit about the depth of coverage at each variant
+```bash
+# Get the total site depth per position, i.e., the sum of read depths from all samples at each variant site, using the INFO/DP field.
+crun.bcftools bcftools query -f '%CHROM\t%POS\t%INFO/DP\n' NC_089312.1_Pverrucosa_genotypes.vcf.gz > NC_089312.1_Pverrucosa_genotypes.total_site_depth            # test using one contig
+crun.bcftools bcftools query -f '%CHROM\t%POS\t%INFO/DP\n' pver_pilot_combined_genotypes.vcf > pver_pilot_combined_genotypes.total_site_depth                # run on full vcf
+```
+```
+NC_089312.1_Pverrucosa  14681   6
+NC_089312.1_Pverrucosa  14695   8
+NC_089312.1_Pverrucosa  14719   8
+NC_089312.1_Pverrucosa  15847   26
+NC_089312.1_Pverrucosa  15864   57
+NC_089312.1_Pverrucosa  15869   64
+NC_089312.1_Pverrucosa  15889   93
+NC_089312.1_Pverrucosa  15901   105
+NC_089312.1_Pverrucosa  15960   197
+NC_089312.1_Pverrucosa  15966   194
+...
+```
+
+```bash
+# Get the per sample depth at each position
+crun.bcftools bcftools query -f '%CHROM\t%POS[\t%DP]\n' NC_089312.1_Pverrucosa_genotypes.vcf.gz > NC_089312.1_Pverrucosa_genotypes.per_sample_depth            # test using one contig
+crun.bcftools bcftools query -f '%CHROM\t%POS[\t%DP]\n' pver_pilot_combined_genotypes.vcf > pver_pilot_combined_genotypes.per_sample_depth                # run on full vcf
+```
+```
+NC_089312.1_Pverrucosa  14681   0       0       0       0       2       0       0       1       0       0       3       0       0       0       0       0
+NC_089312.1_Pverrucosa  14695   0       0       0       0       2       0       0       1       0       0       3       2       0       0       0       0
+NC_089312.1_Pverrucosa  14719   0       0       0       0       0       0       0       3       0       0       3       2       0       0       0       0
+```
+
+```
+# Get a set of summary stats for the vcf (distributions of quality scores, depths, etc)
+crun.bcftools bcftools stats NC_089312.1_Pverrucosa_genotypes.vcf.gz > NC_089312.1_Pverrucosa_genotypes.stats            # test using one contig
+crun.bcftools bcftools stats pver_pilot_combined_genotypes.vcf > pver_pilot_combined_genotypes.stats                # run on full vcf
+```
+
+Plot depth per site in R:
+```r
+# SNP depth of coverage analysis - Pver Pilot
+# 2025-04-25
+# Jason A. Toy
+
+library(tidyverse)
+
+rm(list = ls())
+setwd("/cm/shared/courses/dbarshis/barshislab/jtoy/pver_gwas_pilot/vcf")
+
+
+# load total depth file
+td <- read_tsv("pver_pilot_combined_genotypes.total_site_depth", col_names = FALSE)
+
+# calculate summary stats
+mean_td <- mean(td$X3)
+median_td <- median(td$X3)
+sd_td <- sd(td$X3)
+
+
+# plot distribution
+p <- ggplot(td) +
+  geom_freqpoly(aes(x = X3), binwidth = 1) + 
+  xlab("SNP depth") +
+  xlim(c(0,5000)) +
+  ylab("Count") +
+  geom_vline(xintercept = mean_td, color = "blue") +
+  geom_vline(xintercept = median_td, color = "darkgreen") +
+  geom_vline(xintercept = median_td + sd_td, color = "black", linetype = "dashed") +
+  annotate("text", x=3000, y=30000, label=paste0(round(length(td$X3)/10^6,2), " million SNPs before filtering"), color = 'red') +
+  annotate("text", x=3000, y=28000, label=paste0("mean total depth = ", round(mean_td, 1)), color = "blue") +
+  annotate("text", x=3000, y=26000, label=paste0("median total depth = ", median_td), color = "darkgreen") +
+  annotate("text", x=3000, y=24000, label=paste0("--- ", "median total depth + 1 SD = ", round(median_td + sd_td, 1)), color = "black") +
+  theme_bw()
+
+ggsave(p, "snp_depth_plot.png", width = "12", height = "8", units = "in")
+```
+![]()
+
+# Filter variants with with PLINK2
+
+First filter on quality scores (mapping & variant) and depth with BCFtools:
+```bash
+crun.bcftools bcftools filter --threads 30 -e 'QUAL < 30 || INFO/MQ < 40 || INFO/DP < 32 || INFO/DP > 1790' pver_pilot_combined_genotypes.vcf -Oz -o pver_pilot_QDPfiltered_genotypes.vcf.gz
+```
+This leaves **1,603,744** SNPs
+
+Next filter based on missingess and MAF and remove indels and multiallelic SNPs:
+```bash
+module load plink/2
+
+crun.plink plink2 \
+  --vcf pver_pilot_QDPfiltered_genotypes.vcf.gz \
+  --snps-only just-acgt \
+  --max-alleles 2 \
+  --geno 0.2 \
+  --mind 0.2 \
+  --maf 0.05 \
+  --make-pgen \
+  --out pver_pilot_MISSMAFfiltered_genotypes
+```
+
+Convert to VCF for viewing:
+```bash
+crun.plink plink2 \
+  --pgen pver_pilot_MISSMAFfiltered_genotypes.pgen \
+  --psam pver_pilot_MISSMAFfiltered_genotypes.psam \
+  --pvar pver_pilot_MISSMAFfiltered_genotypes.pvar \
+  --recode vcf \
+  --out pver_pilot_MISSMAFfiltered_genotypes
+```
+This leaves **1,014,944** SNPs
+
+
+## 13. LD-pruning with plink
+```
+--indep-pairwise 50 10 0.5
+--indep-pairwise 50 10 0.1
+200kb 20 0.2
+--indep-pairwise 50 10 0.2
+```
