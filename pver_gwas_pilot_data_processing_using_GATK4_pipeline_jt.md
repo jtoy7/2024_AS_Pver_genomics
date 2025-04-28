@@ -1057,7 +1057,7 @@ grep -v "#" pver_pilot_combined_genotypes.vcf | wc -l
 11,860,400 total SNPs
 
 
-## 12. Variant Filtering
+## 12. Variant filtering
 
 First we need to know a bit about the depth of coverage at each variant
 ```bash
@@ -1134,9 +1134,9 @@ p <- ggplot(td) +
 
 ggsave(p, "snp_depth_plot.png", width = "12", height = "8", units = "in")
 ```
-![]()
+![](snp_depth_plot.png)
 
-# Filter variants with with PLINK2
+### Filter variants with with PLINK2
 
 First filter on quality scores (mapping & variant) and depth with BCFtools:
 ```bash
@@ -1146,7 +1146,7 @@ This leaves **1,603,744** SNPs
 
 Next filter based on missingess and MAF and remove indels and multiallelic SNPs:
 ```bash
-module load plink/2
+module load plink/2024.03.02    # Note: this is PLINK2
 
 crun.plink plink2 \
   --vcf pver_pilot_QDPfiltered_genotypes.vcf.gz \
@@ -1172,9 +1172,263 @@ This leaves **1,014,944** SNPs
 
 
 ## 13. LD-pruning with plink
+PLINK2 requires unique values in the ID field for each SNP. Our dataset does not contain any ID values, but instead has "." placeholders.
+So the first thing we need to do is replace these with a chromosome/position-based ID:
+```bash
+crun.plink plink2 \
+  --pgen pver_pilot_MISSMAFfiltered_genotypes.pgen \
+  --psam pver_pilot_MISSMAFfiltered_genotypes.psam \
+  --pvar pver_pilot_MISSMAFfiltered_genotypes.pvar \
+  --set-all-var-ids @:#:\$r:\$a \
+  --make-pgen \
+  --out pver_pilot_MISSMAFfiltered_uniqIDs
+```
+The `@:#:$r:$a` syntax creates IDs formatted as `CHROM:POS:REF:ALT`
+
+
+```bash
+crun.plink plink2 \
+  --pgen pver_pilot_MISSMAFfiltered_uniqIDs.pgen \
+  --psam pver_pilot_MISSMAFfiltered_uniqIDs.psam \
+  --pvar pver_pilot_MISSMAFfiltered_uniqIDs.pvar \
+  --indep-pairwise 50 10 0.5 \
+  --out pver_pilot_MISSMAFfiltered_ld \
+  --bad-ld
+```
+50 → window size in SNPs (can also be specified in kb if 'kb' is added to as a suffix)
+10 → step size (how many SNPs to shift the window each time)
+0.2 → r² threshold (SNPs with pairwise r² > 0.2 are considered linked)
+**Note**: I had to add the `--bad-ld` flag for now to force plink2 to run the ld estimation even though sample size is low (<50). This will not be an issue with the full dataset.
+I used r2 > 0.5 to be less stringent to account for errors in LD calculation due to low sample size, but for full dataset, may want to try r2 > 0.2.
+
+
+Other parameter sets I've seen in the literature:
 ```
 --indep-pairwise 50 10 0.5
 --indep-pairwise 50 10 0.1
 200kb 20 0.2
 --indep-pairwise 50 10 0.2
 ```
+
+
+Filter dataset using pruned SNP list:
+```bash
+crun.plink plink2 \
+  --pgen pver_pilot_MISSMAFfiltered_uniqIDs.pgen \
+  --pvar pver_pilot_MISSMAFfiltered_uniqIDs.pvar \
+  --psam pver_pilot_MISSMAFfiltered_uniqIDs.psam \
+  --extract pver_pilot_MISSMAFfiltered_ld.prune.in \
+  --make-pgen \
+  --out pver_pilot_ld_pruned_genotypes
+```
+
+Convert to VCF for viewing/downstream use:
+```bash
+crun.plink plink2 \
+  --pgen pver_pilot_ld_pruned_genotypes.pgen \
+  --psam pver_pilot_ld_pruned_genotypes.psam \
+  --pvar pver_pilot_ld_pruned_genotypes.pvar \
+  --recode vcf \
+  --out pver_pilot_ld_pruned_genotypes
+```
+
+**85,473** SNPs remaining after LD-pruning
+
+
+## 13. Principle components analysis
+
+Use PLINK2 to run a PCA:
+```bash
+crun.plink plink2 \
+  --pgen pver_pilot_ld_pruned_genotypes.pgen \
+  --psam pver_pilot_ld_pruned_genotypes.psam \
+  --pvar pver_pilot_ld_pruned_genotypes.pvar \
+  --pca 10 \
+  --out pver_pilot_ld_pruned_pca
+```
+`--pca 10` = calculates the first 10 principal components using exact PCA. For fast approximate PCA (very efficient, but less accurate), use `pca approx 10`.
+
+This gives another error because with a low sample size, PLINK does not trust its allele frequency estimations. So it makes you manually calculate them first if you want to proceed with the PCA anyway:
+```bash
+crun.plink plink2 \
+  --pgen pver_pilot_ld_pruned_genotypes.pgen \
+  --psam pver_pilot_ld_pruned_genotypes.psam \
+  --pvar pver_pilot_ld_pruned_genotypes.pvar \
+  --freq \
+  --out pver_pilot_ld_pruned_genotypes
+```
+This creates a `.afreq` file with calculated allele frequencies.
+
+Now run PCA:
+```bash
+crun.plink plink2 \
+  --pgen pver_pilot_ld_pruned_genotypes.pgen \
+  --psam pver_pilot_ld_pruned_genotypes.psam \
+  --pvar pver_pilot_ld_pruned_genotypes.pvar \
+  --read-freq pver_pilot_ld_pruned_genotypes.afreq \
+  --pca 10 \
+  --out pver_pilot_ld_pruned_pca
+```
+
+Run MDS:
+```bash
+# convert to plink BED format
+crun.plink plink2 \
+  --pgen pver_pilot_ld_pruned_genotypes.pgen \
+  --psam pver_pilot_ld_pruned_genotypes.psam \
+  --pvar pver_pilot_ld_pruned_genotypes.pvar \
+  --make-bed \
+  --out pver_pilot_ld_pruned_genotypes
+
+# switch to PLINK1.9
+module load plink/1.9-20240319
+
+
+# calculate distances and run MDS
+
+# calculate DISSIMILARITY (1-IBS)
+crun.plink plink --bfile pver_pilot_ld_pruned_genotypes --distance square 1-ibs flat-missing --out pver_pilot_ld_pruned_genotypes --allow-extra-chr
+# calculate similarity (IBS)
+crun.plink plink --bfile pver_pilot_ld_pruned_genotypes --distance square ibs flat-missing --out pver_pilot_ld_pruned_genotypes --allow-extra-chr
+
+# --cluster (and therefore --mds-plot) requires a similarity matrix (IBS) not a dissimilarity matrix (1-IBS) so we have to recalculate it:
+crun.plink plink --bfile pver_pilot_ld_pruned_genotypes --distance square ibs flat-missing --cluster --mds-plot 10 eigvals --out pver_pilot_ld_pruned_mds --allow-extra-chr
+```
+
+
+Plot PCA and MDS in R:
+```r
+# Plot PCAs from VCFs - Pver Pilot
+# 2025-04-28
+# Jason A. Toy
+
+rm(list = ls())
+
+setwd("/cm/shared/courses/dbarshis/barshislab/jtoy/pver_gwas_pilot/vcf/")
+
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+
+# Load eigenvectors and eigenvalues
+eigenvec <- read.delim("pver_pilot_ld_pruned_pca.eigenvec", header = TRUE, sep = "\t")
+eigenval <- read.delim("pver_pilot_ld_pruned_pca.eigenval", header = FALSE)
+
+# Calculate percentage of variance explained
+percent_var <- (eigenval$V1 / sum(eigenval$V1)) * 100
+# 31.910371 19.874622 13.395112 10.226324  9.096963  8.523732  1.946494  1.787711  1.635913  1.602758
+
+# Scree Plot
+scree <- percent_var %>% as_tibble %>% rownames_to_column() %>% dplyr::rename(PC = rowname) %>% mutate(PC = as.numeric(PC))
+
+ggplot(scree, aes(x = PC, y = value)) +
+  geom_point() + 
+  geom_line() + 
+  ylab("Percent variance") +
+  theme_minimal()
+  
+
+# Modify eigenvec for plotting
+eigenvec_plot <- eigenvec %>%
+  separate(X.IID, into = c("Year", "Location", "Species", "Genotype", "Lib_ID"), sep = "_", extra = "merge") %>% 
+  mutate(Geno_ID = paste0(Location, "_", Species, "_", Genotype))
+
+
+# Plot PCAs
+
+# Just refrence samples (PC 1/2)
+PC12 <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, color = Species)) +
+  #scale_color_manual(values = c("#9467BDFF", "#E377C2FF", "#1F77B4FF", "#17BECFFF", "#2CA02CFF", "#BCBD22FF", "#FF7F0EFF", "#D62728FF")) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_minimal()
+
+PC34 <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, color = Species)) +
+  #scale_color_manual(values = c("#9467BDFF", "#E377C2FF", "#1F77B4FF", "#17BECFFF", "#2CA02CFF", "#BCBD22FF", "#FF7F0EFF", "#D62728FF")) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_minimal()
+
+
+# 3D plot, (PCs 1-3)
+
+library(plotly)
+
+plot_ly(
+  data = eigenvec_plot,
+  x = ~PC1,
+  y = ~PC2,
+  z = ~PC3,
+  color = ~Species,
+  #colors = c("#1F77B4FF", "#2CA02CFF", "#BCBD22FF", "#FF7F0EFF"),
+  text = ~Geno_ID,
+  type = 'scatter3d',
+  mode = 'markers',
+  marker = list(size = 3)
+) %>%
+  layout(
+    scene = list(
+      xaxis = list(title = paste0("PC1: ", round(percent_var[1], 2), "% variance")),
+      yaxis = list(title = paste0("PC2: ", round(percent_var[2], 2), "% variance")),
+      zaxis = list(title = paste0("PC3: ", round(percent_var[3], 2), "% variance"))
+    )
+  )
+
+
+# Plot various PCA combinations side-by-side
+library(cowplot)
+plot_grid(PC12, PC34, ncol = 2)
+
+# Or
+
+library(patchwork)
+PC12 + PC34
+
+
+
+### MDS plot ###
+
+# Load data
+mds <- read.delim("pver_pilot_ld_pruned_mds.mds", header = TRUE, sep = "")
+mds_eigenval <- read.delim("pver_pilot_ld_pruned_mds.mds.eigvals", header = FALSE)
+
+
+# Calculate percentage of variance explained
+mds_percent_var <- (mds_eigenval$V1 / sum(mds_eigenval$V1)) * 100
+# 43.8433102 22.3020291 11.6108199  8.0809120  7.3672850  6.0334479  0.3582680  0.1439877  0.1335114  0.1264289
+
+
+# Scree Plot
+scree <- mds_percent_var %>% as_tibble %>% rownames_to_column() %>% dplyr::rename(Dim = rowname) %>% mutate(Dim = as.numeric(Dim))
+
+ggplot(scree, aes(x = Dim, y = value)) +
+  geom_point() + 
+  geom_line() + 
+  ylab("Percent variance") +
+  theme_minimal()
+
+
+# Modify mds_coords for plotting
+mds_plotdata <- mds %>%
+  separate(IID, into = c("Year", "Location", "Species", "Genotype", "Lib_ID"), sep = "_", extra = "merge") %>% 
+  mutate(Geno_ID = paste0(Location, "_", Species, "_", Genotype))
+
+# Plot MDS (without 2023 samples)
+mds12 <- ggplot(mds_plotdata, aes(x = C1, y = C2, color = Species)) +
+  #scale_color_manual(values = c("#9467BDFF", "#E377C2FF", "#1F77B4FF", "#17BECFFF", "#2CA02CFF", "#BCBD22FF", "#FF7F0EFF", "#D62728FF")) +
+  #ylim(c(-0.125, 0.15)) +
+  #xlim(c(-0.2, 0.2)) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("MDS1: ", round(mds_percent_var[1], 2), "% variance")) +
+  ylab(paste0("MDS2: ", round(mds_percent_var[2], 2), "% variance")) +
+  geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = 1000) +
+  theme_minimal()
+
+
+# CONCLUSION: PCA and MDS plots are nearly identical
+```
+
