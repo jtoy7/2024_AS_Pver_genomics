@@ -1431,4 +1431,5 @@ mds12 <- ggplot(mds_plotdata, aes(x = C1, y = C2, color = Species)) +
 
 # CONCLUSION: PCA and MDS plots are nearly identical
 ```
-
+![](pver_pilot_pca_plot.png)
+Samples seem to separate clearly into two groups along PC1. We'll see how this pattern holds with the full dataset.
