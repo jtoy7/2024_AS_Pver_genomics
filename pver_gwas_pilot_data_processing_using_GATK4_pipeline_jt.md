@@ -1171,7 +1171,7 @@ crun.plink plink2 \
 This leaves **1,014,944** SNPs
 
 
-## 13. LD-pruning with plink
+## 13. LD-pruning with PLINK2
 PLINK2 requires unique values in the ID field for each SNP. Our dataset does not contain any ID values, but instead has "." placeholders.
 So the first thing we need to do is replace these with a chromosome/position-based ID:
 ```bash
@@ -1195,11 +1195,11 @@ crun.plink plink2 \
   --out pver_pilot_MISSMAFfiltered_ld \
   --bad-ld
 ```
-50 → window size in SNPs (can also be specified in kb if 'kb' is added to as a suffix)
-10 → step size (how many SNPs to shift the window each time)
-0.2 → r² threshold (SNPs with pairwise r² > 0.2 are considered linked)
-**Note**: I had to add the `--bad-ld` flag for now to force plink2 to run the ld estimation even though sample size is low (<50). This will not be an issue with the full dataset.
-I used r2 > 0.5 to be less stringent to account for errors in LD calculation due to low sample size, but for full dataset, may want to try r2 > 0.2.
+- 50 → window size in SNPs (can also be specified in kb if 'kb' is added to as a suffix)
+- 10 → step size (how many SNPs to shift the window each time)
+- 0.2 → r² threshold (SNPs with pairwise r² > 0.2 are considered linked)
+- **Note**: I had to add the `--bad-ld` flag for now to force plink2 to run the ld estimation even though sample size is low (<50). This will not be an issue with the full dataset.
+- I used r2 > 0.5 to be less stringent to account for errors in LD calculation due to low sample size, but for full dataset, may want to try r2 > 0.2.
 
 
 Other parameter sets I've seen in the literature:
@@ -1270,7 +1270,7 @@ crun.plink plink2 \
   --out pver_pilot_ld_pruned_pca
 ```
 
-Run MDS:
+Run MDS with PLINK1.9:
 ```bash
 # convert to plink BED format
 crun.plink plink2 \
