@@ -1381,12 +1381,15 @@ plot_ly(
 
 # Plot various PCA combinations side-by-side
 library(cowplot)
-plot_grid(PC12, PC34, ncol = 2)
+pdf(file = "pver_pilot_pca_plot.pdf", height = 5, width = 10)
+plot_grid(PC12+theme(legend.position = "none"), PC34, ncol = 2)
+dev.off()
+
 
 # Or
 
 library(patchwork)
-PC12 + PC34
+PC12+theme(legend.position = "none") + PC34
 
 
 
@@ -1417,7 +1420,7 @@ mds_plotdata <- mds %>%
   separate(IID, into = c("Year", "Location", "Species", "Genotype", "Lib_ID"), sep = "_", extra = "merge") %>% 
   mutate(Geno_ID = paste0(Location, "_", Species, "_", Genotype))
 
-# Plot MDS (without 2023 samples)
+# Plot MDS
 mds12 <- ggplot(mds_plotdata, aes(x = C1, y = C2, color = Species)) +
   #scale_color_manual(values = c("#9467BDFF", "#E377C2FF", "#1F77B4FF", "#17BECFFF", "#2CA02CFF", "#BCBD22FF", "#FF7F0EFF", "#D62728FF")) +
   #ylim(c(-0.125, 0.15)) +
@@ -1428,6 +1431,20 @@ mds12 <- ggplot(mds_plotdata, aes(x = C1, y = C2, color = Species)) +
   geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = 1000) +
   theme_minimal()
 
+mds34 <- ggplot(mds_plotdata, aes(x = C3, y = C4, color = Species)) +
+  #scale_color_manual(values = c("#9467BDFF", "#E377C2FF", "#1F77B4FF", "#17BECFFF", "#2CA02CFF", "#BCBD22FF", "#FF7F0EFF", "#D62728FF")) +
+  #ylim(c(-0.125, 0.15)) +
+  #xlim(c(-0.2, 0.2)) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("MDS3: ", round(mds_percent_var[3], 2), "% variance")) +
+  ylab(paste0("MDS4: ", round(mds_percent_var[4], 2), "% variance")) +
+  geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = 1000) +
+  theme_minimal()
+
+
+pdf(file = "pver_pilot_mds_plot.pdf", height = 5, width = 10)
+plot_grid(mds12+theme(legend.position = "none"), mds34, ncol = 2)
+dev.off()
 
 # CONCLUSION: PCA and MDS plots are nearly identical
 ```
