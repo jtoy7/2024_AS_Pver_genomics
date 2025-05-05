@@ -1186,6 +1186,7 @@ crun.plink plink2 \
 The `@:#:$r:$a` syntax creates IDs formatted as `CHROM:POS:REF:ALT`
 
 
+Now run LD estimation. Output is an LD-pruned list of SNPs:
 ```bash
 crun.plink plink2 \
   --pgen pver_pilot_MISSMAFfiltered_uniqIDs.pgen \
