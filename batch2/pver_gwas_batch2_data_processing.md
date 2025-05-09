@@ -220,3 +220,66 @@ crun.fastp fastp -i $RAWDATA/$SAMPLEFILE$RAW_R1 \
 
 ```
 
+``` bash
+sbatch fastp_array.slurm
+```
+
+ 
+
+Move html reports to new subdirectory:
+
+``` bash
+mkdir $BASEDIR/reports/fastp_reports/html_reports
+
+mv *.html html_reports
+```
+
+ 
+
+### Visualize with MultiQC (v1.13)
+
+Run multiqc on the directory with the json report files:
+
+``` bash
+module load container_env
+module load multiqc/1.13
+
+crun.multiqc multiqc --interactive --filename multiqc_report_pver_batch2_fastp_interactive .
+# --interactive forces the creation of an interactive html file even when sample sizes are high (instead of a flat file)
+```
+
+
+The following files had fewer than 100,000 reads:
+
+| File                                                             | Passed Filter | Low Quality | Too Many N | Too Short | Too Long | Percent Passed Filter |
+|------------------------------------------------------------------|---------------|-------------|------------|-----------|----------|-----------------------|
+| 24392Brs_2024-ASGWAS-S10-Pver-03-823_R24193_S310_L005_R1_001     | 0             | 52          | 0          | 256       | 0        | 0.00                  |
+| 24392Brs_2024-ASGWAS-S10-Pver-03-823_R24193_S310_L006_R1_001     | 2             | 52          | 0          | 266       | 0        | 0.63                  |
+| 24392Brs_2024-ASGWAS-S06-Pver-14-614_R24193_S99_L006_R1_001      | 6             | 0           | 0          | 0         | 0        | 100.00                |
+| 24392Brs_2024-ASGWAS-S02-Pver-11-871-B_R24193_S754_L008_R1_001   | 10            | 0           | 0          | 0         | 0        | 100.00                |
+| 24392Brs_2024-ASGWAS-S02-Pver-11-871-B_R24193_S754_L007_R1_001   | 12            | 0           | 0          | 0         | 0        | 100.00                |
+| 24392Brs_2024-ASGWAS-S06-Pver-14-614_R24193_S99_L005_R1_001      | 20            | 0           | 0          | 2         | 0        | 90.91                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-24-624_R24193_S109_L006_R1_001     | 184           | 2           | 0          | 0         | 0        | 98.92                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-24-624_R24193_S109_L005_R1_001     | 194           | 2           | 0          | 0         | 0        | 98.98                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-27-627_R24193_S112_L006_R1_001     | 436           | 0           | 2          | 0         | 0        | 99.54                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-27-627_R24193_S112_L005_R1_001     | 438           | 8           | 0          | 4         | 0        | 97.33                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-16-616_R24193_S101_L006_R1_001     | 520           | 2           | 0          | 10        | 0        | 97.74                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-16-616_R24193_S101_L005_R1_001     | 564           | 18          | 0          | 12        | 0        | 94.95                 |
+| 24392Brs_2024-ASGWAS-S10-Pver-03-823-B_R24193_S706_L007_R1_001   | 726           | 66538       | 0          | 384924    | 0        | 0.16                  |
+| 24392Brs_2024-ASGWAS-S10-Pver-03-823-B_R24193_S706_L008_R1_001   | 730           | 67944       | 4          | 370340    | 0        | 0.17                  |
+| 24392Brs_2024-ASGWAS-S02-Ahya-21-915_R24193_S369_L006_R1_001     | 2468          | 16          | 0          | 4         | 0        | 99.20                 |
+| 24392Brs_2024-ASGWAS-S02-Ahya-21-915_R24193_S369_L005_R1_001     | 2528          | 24          | 0          | 8         | 0        | 98.75                 |
+| 24392Brs_2024-ASGWAS-S11-Pspp-Extra1-918_R24193_S372_L006_R1_001 | 3952          | 16          | 0          | 14        | 0        | 99.25                 |
+| 24392Brs_2024-ASGWAS-S11-Pspp-Extra1-918_R24193_S372_L005_R1_001 | 4092          | 36          | 0          | 20        | 0        | 98.65                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-12-612_R24193_S97_L005_R1_001      | 9586          | 272         | 0          | 546       | 0        | 92.14                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-12-612_R24193_S97_L006_R1_001      | 9766          | 282         | 0          | 442       | 0        | 93.10                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-18-618_R24193_S103_L005_R1_001     | 34056         | 802         | 4          | 556       | 0        | 96.15                 |
+| 24392Brs_2024-ASGWAS-S06-Pver-18-618_R24193_S103_L006_R1_001     | 34800         | 852         | 0          | 534       | 0        | 96.17                 |
+
+
+Sample 823 (S10_Pver_03) was clearly problematic.
+But overall, sequences look good:
+![image](https://github.com/user-attachments/assets/14f6689d-4d7a-47a8-9af7-52d2780b39ac)
+
+![image](https://github.com/user-attachments/assets/e8753fc5-dd65-4391-9c3a-93fffa119891)
+
