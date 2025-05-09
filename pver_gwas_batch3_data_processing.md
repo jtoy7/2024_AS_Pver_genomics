@@ -21,7 +21,11 @@ done
 cd ./24392Brs_N24196
 
 # check md5sums
-md5sum -c MD5SUMS_24392Brs_N24193_L005.txt > md5checks.txt
+md5sum -c MD5SUMS_24392Brs_N24196_L001.txt > md5checks.txt
+
+for FILE in MD5SUMS_24392Brs_N24196_L*.txt; do
+  md5sum -c $FILE >> md5checks.txt
+done
 ```
 
 
@@ -161,13 +165,13 @@ nano fastp_array.slurm
 ``` bash
 #!/bin/bash
 
-#SBATCH --job-name fastp_array_2025-05-05
+#SBATCH --job-name fastp_array_2025-05-06
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
-#SBATCH --array=1-3118%16
+#SBATCH --array=1-3118%100
 #SBATCH --ntasks=1
 #SBATCH --mem=30G
 #SBATCH --time 7-00:00:00
@@ -179,7 +183,7 @@ module load fastp
 
 ## Define some variables
 BASEDIR=/archive/barshis/barshislab/jtoy/
-RAWDATA=/RC/group/rc_barshis_lab/taxonarchive/2024-15-05_TxGenPverrucosa_batch3/24392Brs_N24196 #path to raw fq.gz files
+RAWDATA=/RC/group/rc_barshis_lab/taxonarchive/2024-12-05_TxGenPverrucosa_batch3/24392Brs_N24196 #path to raw fq.gz files
 OUTDIR=$BASEDIR/pver_gwas/pver_gwas_batch3/trimmed_fastq
 SAMPLELIST=$BASEDIR/pver_gwas/pver_gwas_batch3/sample_lists/fastq_list_pver_gwas_batch3.txt # Path to a list of prefixes of the raw fastq files. It can be a subset of the the 1st column of the sample table (without the header line).
 SAMPLETABLE=$BASEDIR/pver_gwas/pver_gwas_batch3/sample_lists/fastq_table_pver_gwas_batch3.txt # Path to a sample table where the 1st column is the prefix of the raw fastq files. The 4th column is the sample ID, the 2nd column is the lane number, and the 3rd column is sequence ID. The combination of these three columns have to be unique. The 6th column should be data type, which is either pe or se.
