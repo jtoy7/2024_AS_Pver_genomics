@@ -283,3 +283,124 @@ But overall, sequences look good:
 
 ![image](https://github.com/user-attachments/assets/e8753fc5-dd65-4391-9c3a-93fffa119891)
 
+<br>
+
+## Map reads to hologenome
+
+`hologenome_mapping_array.slurm`
+```bash
+#!/bin/bash
+
+#SBATCH --job-name hologenome_mapping_array_pverbatch2_2025-05-09
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-1560%100
+#SBATCH --ntasks=1
+#SBATCH --mem=30G
+#SBATCH --time 7-00:00:00
+
+
+## Load modules
+module load container_env bowtie2
+
+## Define some variables
+BASEDIR=/archive/barshis/barshislab/jtoy/
+FASTQDIR=$BASEDIR/pver_gwas/pver_gwas_batch2/trimmed_fastq #path to trimmed fastq.gz files
+OUTDIR=$BASEDIR/pver_gwas/pver_gwas_batch2/bam
+SAMPLELIST=$BASEDIR/pver_gwas/pver_gwas_batch2/sample_lists/fastq_list_pver_gwas_batch2.txt # Path to a list of prefixes of the raw fastq files. It can be a subset of the the 1st column of the sample table.
+SAMPLETABLE=$BASEDIR/pver_gwas/pver_gwas_batch2/sample_lists/fastq_table_pver_gwas_batch2.txt # Path to a sample table where the 1st column is the prefix of the raw fastq files. The 4th column is the sample ID, the 2nd column is the lane number, and the 3rd column is sequence ID. The combination of these three columns has to be unique. The 6th column should be data type, which is either pe or se.
+FASTQ_SUFFIX_1=_f_paired_trim.fastq.gz # Suffix to trimmed fastq files. Use forward reads with paired-end data.
+FASTQ_SUFFIX_2=_r_paired_trim.fastq.gz # Suffix to trimmed fastq files. Use reverse reads with paired-end data.
+REFBASENAME=combined_pver_cd_hologenome
+
+## Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+## Select the SAMPLE from the SAMPLELIST
+SAMPLEFILE=`head $SAMPLELIST -n $SLURM_ARRAY_TASK_ID | tail -n 1`
+
+## Keep record of sample file
+echo $SAMPLEFILE
+
+## Extract relevant values from a table of sample, sequencing, and lane ID (here in columns 4, 3, 2, respectively) for each sequenced library. This is for the naming of trimmed/processed files
+SAMPLE_ID=`grep -P "${SAMPLEFILE}\t" $SAMPLETABLE | cut -f 4`
+POP_ID=`grep -P "${SAMPLEFILE}\t" $SAMPLETABLE | cut -f 5`
+SEQ_ID=`grep -P "${SAMPLEFILE}\t" $SAMPLETABLE | cut -f 3`
+LANE_ID=`grep -P "${SAMPLEFILE}\t" $SAMPLETABLE | cut -f 2`
+PREP_ID=`grep -P "${SAMPLEFILE}\t" $SAMPLETABLE | cut -f 13`
+SAMPLE_UNIQ_ID=$SAMPLE_ID'_'$SEQ_ID'_'$PREP_ID'_'$LANE_ID  # When a sample has been sequenced in multiple lanes, we need to be able to identify the files from each run uniquely
+PU=`grep -P "${SAMPLEFILE}\t" $SAMPLETABLE | cut -f 2` # Define platform unit (PU), which is the lane number
+
+echo $SAMPLE_UNIQ_ID
+
+## Define the output path and file prefix
+SAMPLEOUT=$OUTDIR/$SAMPLE_UNIQ_ID
+
+
+## Run bowtie2 to map paired-end reads
+# Note: we ignore the reads that get orphaned during adapter clipping because that is typically a very small proportion of reads. If a large proportion of reads get orphaned (loose their mate so they become single-end), these can be mapped in a separate step and the resulting bam files merged with the paired-end mapped reads.
+crun.bowtie2 bowtie2 -q --phred33 --very-sensitive -p 16 -I 0 -X 1500 --fr --rg-id $SAMPLE_UNIQ_ID --rg SM:$SAMPLE_ID --rg LB:$SAMPLE_ID --rg PU:$PU --rg PL:ILLUMINA \
+        -x /cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/$REFBASENAME -1 $FASTQDIR/$SAMPLE_UNIQ_ID$FASTQ_SUFFIX_1 -2 $FASTQDIR/$SAMPLE_UNIQ_ID$FASTQ_SUFFIX_2 \
+        -S $SAMPLEOUT'_bt2_'$REFBASENAME'.sam'
+
+#add version number to bowtie2 command header line in SAM file
+sed 's/PN:bowtie2\tVN:/PN:bowtie2\tVN:2.4.1/' $SAMPLEOUT'_bt2_'$REFBASENAME'.sam' > $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered.sam'
+
+#remove SAM file
+rm $SAMPLEOUT'_bt2_'$REFBASENAME'.sam'
+
+## Change modules
+module unload bowtie2
+module load container_env gatk
+GATK='crun.gatk gatk'
+
+## Query-sort for duplicate removal with GATK
+# Run SortSam to sort by query name and convert to BAM
+$GATK --java-options "-Xmx100G" SortSam \
+  --INPUT $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered.sam' \
+  --OUTPUT $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted.bam' \
+  --SORT_ORDER queryname
+
+# Run validation of BAM file
+$GATK --java-options "-Xmx100G" ValidateSamFile \
+  -I $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted.bam' \
+  -O $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted.val' \
+  -M VERBOSE
+
+#remove SAM file
+rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered.sam'
+
+## Mark and remove duplicates
+$GATK --java-options "-Xmx100G" MarkDuplicates \
+  -I $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted.bam' \
+  -O $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam' \
+  --METRICS_FILE $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dupstat.txt' \
+  --REMOVE_DUPLICATES true
+
+## Run validation of BAM file
+$GATK --java-options "-Xmx100G" ValidateSamFile \
+  -I $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam' \
+  -O $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.val' \
+  -M VERBOSE
+
+#remove old BAM file
+rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted.bam'
+
+## Run SortSam to sort by coordinate for downstream processing
+$GATK --java-options "-Xmx100G" SortSam \
+  --INPUT $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam' \
+  --OUTPUT $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup_coordsorted.bam' \
+  --SORT_ORDER coordinate
+
+# Run validation of BAM file
+$GATK --java-options "-Xmx100G" ValidateSamFile \
+  -I $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup_coordsorted.bam' \
+  -O $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup_coordsorted.val' \
+  -M VERBOSE
+
+#remove old BAM files
+rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam'
+```
