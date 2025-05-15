@@ -328,10 +328,10 @@ Sample 823 (S10_Pver_03) was again problematic, but again, most samples looked g
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
-#SBATCH --array=1-3118%100
+#SBATCH --array=1-3118%110
 #SBATCH --ntasks=1
 #SBATCH --mem=30G
-#SBATCH --time 7-00:00:00
+#SBATCH --time 14-00:00:00
 
 
 ## Load modules
