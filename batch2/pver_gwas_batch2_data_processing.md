@@ -465,3 +465,43 @@ jobid   sample  concordantly_0_times    concordantly_1_time     concordantly_2_o
 ```
 
 Most libraries had 70-90% mapping rate. The only libraries with really low mapping were the problematic AOAA_Pver_03 libraries (sample 823), which had little to no sequence data.
+
+
+Check duplicate rate of each library:
+`summarize_dedup.sh`
+```bash
+#!/bin/bash
+
+# Create output file
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/pver_gwas_batch2/bam/
+OUTFILE=$BAMDIR/dupstat_summary.tsv
+
+
+# Change working directory
+cd $BAMDIR
+
+# Print header
+echo -e "FILE\tLIBRARY\tUNPAIRED_READS_EXAMINED\tREAD_PAIRS_EXAMINED\tSECONDARY_OR_SUPPLEMENTARY_RDS\tUNMAPPED_READS\tUNPAIRED_READ_DUPLICATES\tREAD_PAIR_DUPLICATES\tREAD_PAIR_OPTICAL_DUPLICATES\tPERCENT_DUPLICATION\tESTIMATED_LIBRARY_SIZE" > $OUTFILE
+
+# Loop through all dupstat files
+for FILE in `ls *dupstat.txt`; do
+    # Extract the second line after the "## METRICS CLASS" line (i.e., the actual data)
+    DATA=$(awk '/^## METRICS CLASS/ {getline; getline; print}' "$FILE")
+
+    # Only print if data was found
+    if [ -n "$data" ]; then
+        echo -e "$FILE\t$DATA" >> $OUTFILE
+    fi
+done
+```
+
+
+Make list of deduped bam files:
+```bash
+cd $BASEDIR/pver_gwas/pver_gwas_batch2/bam
+
+ls *dedup_coordsorted.bam > first_dedup_bams_list.txt
+```
+
+
