@@ -544,8 +544,8 @@ Make list of deduped bam files:
 ```bash
 cd $BASEDIR/pver_gwas/pver_gwas_batch2/bam
 
-# Exclude Ahya samples
-ls *dedup_coordsorted.bam | grep -v "Ahya" > $BASEDIR/pver_gwas/pver_gwas_batch2/sample_lists/first_dedup_bams_list.txt
+# Exclude Ahya samples and AOAA_Pver_03
+ls *dedup_coordsorted.bam | grep -v "Ahya" | grep -v "AOAA_Pver_03" > $BASEDIR/pver_gwas/pver_gwas_batch2/sample_lists/first_dedup_bams_list.txt
 ```
 
 
