@@ -489,19 +489,74 @@ for FILE in `ls *dupstat.txt`; do
     # Extract the second line after the "## METRICS CLASS" line (i.e., the actual data)
     DATA=$(awk '/^## METRICS CLASS/ {getline; getline; print}' "$FILE")
 
-    # Only print if data was found
-    if [ -n "$data" ]; then
-        echo -e "$FILE\t$DATA" >> $OUTFILE
-    fi
+    # Print data to outfile
+    echo -e "$FILE\t$DATA" >> $OUTFILE
+
 done
 ```
 
+Check highest and lowest duplication rates:
+```bash
+cut -f1,2,10 dupstat_summary.tsv | sort -k3,3 -r | less -S
+```
+
+```
+FILE    LIBRARY  PERCENT_DUPLICATION
+2024_OFU3_Pver_24_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU3_Pver_24       0.411043
+2024_OFU6_Pver_09_2_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU6_Pver_09       0.386071
+2024_ALOF_Pver_29_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_ALOF_Pver_29       0.385199
+2024_FASA_Pver_15_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_FASA_Pver_15       0.383865
+2024_AOAA_Pver_14_1_C_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_14       0.380662
+2024_ALOF_Pver_16_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_ALOF_Pver_16       0.380572
+2024_OFU3_Pver_02_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU3_Pver_02       0.380224
+2024_OFU3_Pver_27_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU3_Pver_27       0.379581
+2024_OFU6_Pver_37_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU6_Pver_37       0.37952
+2024_OFU6_Pver_23_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU6_Pver_23       0.379348
+.
+.
+.
+2024_VATI_Pver_17_1_A_R24193_L005_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_VATI_Pver_17       0.19117
+2024_FALU_Pver_07_1_B_R24193_L008_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_FALU_Pver_07       0.187915
+2024_FTEL_Pspp_Extra4_1_B_R24193_L008_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt    2024_FTEL_Pspp_Extra4   0.187366
+2024_FALU_Pver_07_1_B_R24193_L007_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_FALU_Pver_07       0.184777
+2024_FTEL_Pspp_Extra4_1_B_R24193_L007_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt    2024_FTEL_Pspp_Extra4   0.184141
+2024_LEON_Ahya_20_1_A_R24193_L005_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Ahya_20       0.171918
+2024_VATI_Pver_17_1_B_R24193_L008_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_VATI_Pver_17       0.16253
+2024_LEON_Ahya_22_1_A_R24193_L005_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Ahya_22       0.161357
+2024_VATI_Pver_17_1_B_R24193_L007_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_VATI_Pver_17       0.160422
+2024_LEON_Ahya_21_1_B_R24193_L008_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Ahya_21       0.154049
+2024_LEON_Ahya_21_1_B_R24193_L007_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Ahya_21       0.150041
+2024_LEON_Ahya_21_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Ahya_21       0.137405
+2024_LEON_Pver_03_1_B_R24193_L007_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Pver_03       0.131453
+2024_LEON_Pver_03_1_B_R24193_L008_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Pver_03       0.131412
+2024_LEON_Ahya_21_1_A_R24193_L005_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Ahya_21       0.095652
+2024_AOAA_Pver_03_1_B_R24193_L008_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0.032258
+2024_AOAA_Pver_03_1_B_R24193_L007_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0.022727
+2024_OFU3_Pver_14_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU3_Pver_14       0
+2024_AOAA_Pver_03_1_A_R24193_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0
+2024_AOAA_Pver_03_1_A_R24193_L005_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0
+```
+Most samples had **20-40% duplicates**.
+
+<br>
 
 Make list of deduped bam files:
 ```bash
 cd $BASEDIR/pver_gwas/pver_gwas_batch2/bam
 
-ls *dedup_coordsorted.bam > first_dedup_bams_list.txt
+# Exclude Ahya samples
+ls *dedup_coordsorted.bam | grep -v "Ahya" > $BASEDIR/pver_gwas/pver_gwas_batch2/sample_lists/first_dedup_bams_list.txt
 ```
 
 
+## Create symbolic links (shortcuts) for BAM files in a new directory called `$BASEDIR/pver_gwas/hologenome_mapped_all/`
+```bash
+mkdir $BASEDIR/pver_gwas/hologenome_mapped_all/
+
+BAMDIR=$BASEDIR/pver_gwas/pver_gwas_batch2/bam
+BAMLIST=$BASEDIR/pver_gwas/pver_gwas_batch2/sample_lists/first_dedup_bams_list.txt
+
+for FILE in $(cat $BAMLIST); do
+  ln -s $BAMDIR/$FILE $BASEDIR/pver_gwas/hologenome_mapped_all/
+done
+```
