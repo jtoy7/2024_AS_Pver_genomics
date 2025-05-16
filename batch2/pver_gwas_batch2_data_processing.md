@@ -404,3 +404,64 @@ $GATK --java-options "-Xmx100G" ValidateSamFile \
 #remove old BAM files
 rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam'
 ```
+
+
+Run the `parse_bowtie2_output.sh` script to parse summary mapping statistics from each file. The output file is called bowtie_mapping_summary.tsv
+```bash
+#!/bin/bash
+
+ls *hologenome_mapping*.err > errfile_list.txt
+
+# create data file and add header if it is empty
+header="jobid\tsample\tconcordantly_0_times\tconcordantly_1_time\tconcordantly_2_or_more_times\toverall_rate" #assign header value
+outfile="bowtie_mapping_summary.tsv"
+
+if [ ! -s "$outfile" ]; then
+  # file is empty or does not exist
+    echo -e "$header" > "$outfile"
+fi
+
+for FILE in `cat errfile_list.txt`; do
+    # parse mapping rates from botwtie2 otuput
+    jobid=$(echo $FILE | cut -d "_" -f1,2)
+    sample=$(head -3 $jobid'_hologenome_mapping_array_pverbatch2_2025-05-09.out' | tail -1)
+    con0=$(grep -oP '\d+\.\d+%?' $jobid'_hologenome_mapping_array_pverbatch2_2025-05-09.err' | head -2 | tail -1)
+    con1=$(grep -oP '\d+\.\d+%?' $jobid'_hologenome_mapping_array_pverbatch2_2025-05-09.err' | head -3 | tail -1)
+    con2=$(grep -oP '\d+\.\d+%?' $jobid'_hologenome_mapping_array_pverbatch2_2025-05-09.err' | head -4 | tail -1)
+    overall=$(grep -oP '\d+\.\d+%? overall alignment rate' $jobid'_hologenome_mapping_array_pverbatch2_2025-05-09.err' | cut -d" " -f1)
+
+    # Append data to output file
+    echo -e "$jobid\t$sample\t$con0\t$con1\t$con2\t$overall" >> "$outfile"
+
+done
+```
+
+Check for low-mapping samples:
+```bash
+sort -V -k6,6 bowtie_mapping_summary.tsv | grep -v "Ahya" | less -S
+```
+
+```
+jobid   sample  concordantly_0_times    concordantly_1_time     concordantly_2_or_more_times    overall_rate
+4419996_1403    2024_AOAA_Pver_03_1_A_R24193_L005       4.5     0.0     4.5     0.00%
+4419996_1404    2024_AOAA_Pver_03_1_A_R24193_L006       100.00% 0.00%   0.00%   0.00%
+4419996_1402    2024_AOAA_Pver_03_1_B_R24193_L008       100.00% 0.00%   0.00%   4.25%
+4419996_1401    2024_AOAA_Pver_03_1_B_R24193_L007       100.00% 0.00%   0.00%   6.06%
+4419996_747     2024_OFU3_Pver_13_1_B_R24193_L007       47.16%  34.22%  18.61%  63.48%
+4419996_748     2024_OFU3_Pver_13_1_B_R24193_L008       47.24%  34.17%  18.59%  63.49%
+4419996_749     2024_OFU3_Pver_13_1_A_R24193_L005       44.75%  35.60%  19.65%  64.20%
+4419996_750     2024_OFU3_Pver_13_1_A_R24193_L006       44.97%  35.53%  19.50%  64.20%
+4419996_579     2024_MALO_Pver_11_1_B_R24193_L007       38.95%  39.25%  21.80%  69.49%
+4419996_580     2024_MALO_Pver_11_1_B_R24193_L008       38.97%  39.25%  21.78%  69.51%
+4419996_581     2024_MALO_Pver_11_1_A_R24193_L005       37.92%  39.77%  22.31%  70.24%
+4419996_582     2024_MALO_Pver_11_1_A_R24193_L006       38.16%  39.67%  22.17%  70.24%
+4419996_1177    2024_FTEL_Pver_33_1_B_R24193_L007       40.38%  39.13%  20.49%  73.68%
+4419996_1178    2024_FTEL_Pver_33_1_B_R24193_L008       40.48%  39.06%  20.47%  73.68%
+4419996_1180    2024_FTEL_Pver_33_1_A_R24193_L006       39.18%  39.55%  21.27%  73.76%
+4419996_1179    2024_FTEL_Pver_33_1_A_R24193_L005       38.85%  39.69%  21.46%  73.78%
+4419996_1548    2024_AOAA_Pver_39_1_B_R24193_L008       37.75%  41.42%  20.83%  76.02%
+4419996_1547    2024_AOAA_Pver_39_1_B_R24193_L007       37.62%  41.50%  20.88%  76.05%
+4419996_1550    2024_AOAA_Pver_39_1_A_R24193_L006       36.00%  42.35%  21.65%  76.40%
+```
+
+Most libraries had 70-90% mapping rate. The only libraries with really low mapping were the problematic AOAA_Pver_03 libraries (sample 823), which had little to no sequence data.
