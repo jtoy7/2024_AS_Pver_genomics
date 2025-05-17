@@ -108,7 +108,6 @@ cut -f1 fastq_table_pver_gwas_batch3.txt | tail -n +2 > fastq_list_pver_gwas_bat
 ```
 
 
-
 Assign starting environment variables and check environment and fastq_table:
 
 ``` bash
@@ -145,6 +144,84 @@ done
 24392Brs_2024-ASGWAS-S01-Pver-02-542_R24196_S26_L004 refers to sample 2024_FALU_Pver_02 from FALU
 ...
 ```
+
+
+Check number of sequence file pairs:
+```bash
+tail -n +2 fastq_table_pver_gwas_batch3.txt | wc -l
+```
+```
+3118
+```
+
+Check number of unique libraries:
+```bash
+cut -f1 fastq_table_pver_gwas_batch3.txt | tail -n +2 | cut -f2 -d "_" | cut -f1-7 -d "-" | sort | uniq | wc -l
+```
+```
+772
+```
+
+Count number of "A" libraries:
+```bash
+# counting separate extractions
+grep -P "\tA\t" fastq_table_pver_gwas_batch3.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | wc -l
+
+# merging replicate extractions (e.g., 2024-ASGWAS-S02-Pver-14-874-a & 2024-ASGWAS-S02-Pver-14-874-b)
+grep -P "\tA\t" fastq_table_pver_gwas_batch3.txt | cut -f1 | cut -f2 -d "_" | cut -f1-6 -d "-" | sort | uniq | wc -l
+```
+```
+384  # counting each extraction separately
+380  # excluding replicate extractions
+```
+
+Count number of "B" libraries:
+```bash
+# counting separate extractions
+grep -P "\tB\t" fastq_table_pver_gwas_batch3.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | wc -l
+
+# merging replicate extractions
+grep -P "\tB\t" fastq_table_pver_gwas_batch3.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | grep -v -P "\-b\-" | wc -l
+```
+```
+382  # counting each extraction separately
+378  # excluding replicate extractions
+```
+
+Count number of "C" libraries:
+```
+# counting separate extractions
+grep -P "\tC\t" fastq_table_pver_gwas_batch3.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | wc -l
+
+# merging replicate extractions
+grep -P "\tC\t" fastq_table_pver_gwas_batch3.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | grep -v -P "\-b\-" | wc -l
+```
+```
+14  # counting each extraction separately
+14  # excluding replicate extractions
+```
+
+
+Check number of unique extractions:
+```bash
+cut -f4,3 fastq_table_pver_gwas_batch3.txt | tail -n +2 | uniq | wc -l
+```
+```
+384
+```
+We submitted 4 plates of AS samples (including a few some Ahya from Leone), so this matches expectations.
+
+
+Check number of unique samples:
+```bash
+cut -f4 fastq_table_pver_gwas_batch3.txt | tail -n +2 | sort | uniq | wc -l
+```
+```
+380
+```
+We submitted 4 samples with two replicate extractions, so this matches expectations.
+
+
 
 
 
@@ -434,4 +511,76 @@ $GATK --java-options "-Xmx100G" ValidateSamFile \
 
 #remove old BAM files
 rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam'
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Run script `merge_bams_by_sample_array.slurm` to merge bams from the 2 different batches (4 + 8 = 12 lanes per library) by sample
+```bash
+#!/bin/bash
+
+#SBATCH --job-name=merge_its2_bams_by_sample_2025-05-20
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-%110
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=16
+
+## Load modules
+module load container_env samtools
+
+## Define some variables
+BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
+BAMDIR=$BASEDIR/ahya_gwas_pilot/its2_mapping_all
+OUTDIR=$BASEDIR/ahya_gwas_pilot/its2_mapping_all/merged_bams
+SAMPLELIST=($(ls $BAMDIR/*.bam | sed -E 's/.*\/(FALU_[0-9]+)_.*/\1/' | sort | uniq))
+REFBASENAME=SymPortal-Itrimmed
+
+
+# Create output directory if it doesn't exist
+mkdir -p "$OUTDIR"
+
+
+# Get the sample name for current array task
+SAMPLE="${SAMPLELIST[$SLURM_ARRAY_TASK_ID-1]}"
+
+# Keep record of sample file
+echo $SAMPLE
+
+# List the BAM files for the current sample
+BAMFILES=$(ls $BAMDIR/${SAMPLE}_*.bam)
+
+# Keep record of BAM files
+echo $BAMFILES
+
+# Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+# Define the output merged BAM file name
+MERGEDBAM=$OUTDIR/$SAMPLE'_1_'$REFBASENAME'_merged.bam'
+
+
+# Merge the BAM files for the sample
+echo "Merging BAM files for $SAMPLE into $MERGEDBAM..."
+crun.samtools samtools merge -f -@ 16 "$MERGEDBAM" $BAMFILES
+
+
+echo "Merging complete for $SAMPLE!"
+sbatch merge_bams_by_sample_array.slurm
 ```
