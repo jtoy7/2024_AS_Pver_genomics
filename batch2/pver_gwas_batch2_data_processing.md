@@ -138,6 +138,83 @@ done
 ```
 
 
+Check number of sequence file pairs:
+```bash
+tail -n +2 fastq_table_pver_gwas_batch2_all.txt | wc -l
+```
+```
+1584
+```
+
+Check number of unique libraries:
+```bash
+cut -f1 fastq_table_pver_gwas_batch2_all.txt | cut -f2 -d "_" | cut -f1-7 -d "-" | sort | uniq | wc -l
+```
+```
+785
+```
+
+Count number of "A" libraries:
+```bash
+# counting separate extractions
+grep -P "\tA\t" fastq_table_pver_gwas_batch2_all.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | wc -l
+
+# merging replicate extractions (e.g., 2024-ASGWAS-S02-Pver-14-874-a & 2024-ASGWAS-S02-Pver-14-874-b)
+grep -P "\tA\t" fastq_table_pver_gwas_batch2_all.txt | cut -f1 | cut -f2 -d "_" | cut -f1-6 -d "-" | sort | uniq | wc -l
+```
+```
+392  # counting each extraction separately
+388  # excluding replicate extractions
+```
+
+Count number of "B" libraries:
+```bash
+# counting separate extractions
+grep -P "\tB\t" fastq_table_pver_gwas_batch2_all.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | wc -l
+
+# merging replicate extractions
+grep -P "\tB\t" fastq_table_pver_gwas_batch2_all.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | grep -v -P "\-b\-" | wc -l
+```
+```
+382  # counting each extraction separately
+378  # excluding replicate extractions
+```
+
+Count number of "C" libraries:
+```
+# counting separate extractions
+grep -P "\tC\t" fastq_table_pver_gwas_batch2_all.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | wc -l
+
+# merging replicate extractions
+grep -P "\tC\t" fastq_table_pver_gwas_batch2_all.txt | cut -f1 | cut -f2 -d "_" | sort | uniq | grep -v -P "\-b\-" | wc -l
+```
+```
+18  # counting each extraction separately
+18  # excluding replicate extractions
+```
+
+
+Check number of unique extractions:
+```bash
+cut -f4,3 fastq_table_pver_gwas_batch2_all.txt | uniq | wc -l
+```
+```
+393
+```
+
+
+Check number of unique samples:
+```bash
+cut -f4 fastq_table_pver_gwas_batch2_all.txt | sort | uniq | wc -l
+```
+```
+389
+```
+
+We originally submitted 392 samples, so 3 might have been dropped in the QC process?
+
+
+
 
 ## Check read quality and trim reads using fastp (v0.23.2)
 
@@ -560,3 +637,19 @@ for FILE in $(cat $BAMLIST); do
   ln -s $BAMDIR/$FILE $BASEDIR/pver_gwas/hologenome_mapped_all/
 done
 ```
+
+There are now 1544 bam files remaining.
+
+<br>
+
+Double check number of unique libraries remaining (should be half of the number of bam files):
+```bash
+cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
+
+ls | cut -f1-6 -d "_" | sort | uniq | wc -l
+```
+
+```
+772
+```
+
