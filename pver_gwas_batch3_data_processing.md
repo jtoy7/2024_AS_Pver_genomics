@@ -536,7 +536,7 @@ rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam'
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
-#SBATCH --array=1-%110
+#SBATCH --array=1-780%110
 #SBATCH --ntasks=1
 #SBATCH --mem=100G
 #SBATCH --time 5-00:00:00
@@ -549,8 +549,8 @@ module load container_env samtools
 BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
 BAMDIR=$BASEDIR/ahya_gwas_pilot/its2_mapping_all
 OUTDIR=$BASEDIR/ahya_gwas_pilot/its2_mapping_all/merged_bams
-SAMPLELIST=($(ls $BAMDIR/*.bam | sed -E 's/.*\/(FALU_[0-9]+)_.*/\1/' | sort | uniq))
-REFBASENAME=SymPortal-Itrimmed
+SAMPLELIST=($(ls $BAMDIR/*.bam | sed -E 's/.*\/([A-Z]{4}_P[A-Z]{3}_[0-9]+_[12]_[ABC])_.*/\1/' | sort | uniq))
+REFBASENAME=combined_pver_cd_hologenome
 
 
 # Create output directory if it doesn't exist
