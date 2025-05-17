@@ -148,10 +148,10 @@ tail -n +2 fastq_table_pver_gwas_batch2_all.txt | wc -l
 
 Check number of unique libraries:
 ```bash
-cut -f1 fastq_table_pver_gwas_batch2_all.txt | tail -n +2 | cut -f2 -d "_" | cut -f1-7 -d "-" | sort | uniq | wc -l
+cut -f4,3,13 fastq_table_pver_gwas_batch2_all.txt | tail -n +2 | uniq | wc -l
 ```
 ```
-784
+792
 ```
 
 Count number of "A" libraries:
