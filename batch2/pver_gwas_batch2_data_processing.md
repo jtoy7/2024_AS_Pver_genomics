@@ -148,10 +148,10 @@ tail -n +2 fastq_table_pver_gwas_batch2_all.txt | wc -l
 
 Check number of unique libraries:
 ```bash
-cut -f1 fastq_table_pver_gwas_batch2_all.txt | cut -f2 -d "_" | cut -f1-7 -d "-" | sort | uniq | wc -l
+cut -f1 fastq_table_pver_gwas_batch2_all.txt | tail -n +2 | cut -f2 -d "_" | cut -f1-7 -d "-" | sort | uniq | wc -l
 ```
 ```
-785
+784
 ```
 
 Count number of "A" libraries:
@@ -196,22 +196,24 @@ grep -P "\tC\t" fastq_table_pver_gwas_batch2_all.txt | cut -f1 | cut -f2 -d "_" 
 
 Check number of unique extractions:
 ```bash
-cut -f4,3 fastq_table_pver_gwas_batch2_all.txt | uniq | wc -l
+cut -f4,3 fastq_table_pver_gwas_batch2_all.txt | tail -n +2 | uniq | wc -l
 ```
 ```
-393
+392
 ```
+We originally submitted 392 samples, so this matches expectations.
 
 
 Check number of unique samples:
 ```bash
-cut -f4 fastq_table_pver_gwas_batch2_all.txt | sort | uniq | wc -l
+cut -f4 fastq_table_pver_gwas_batch2_all.txt | tail -n +2 | sort | uniq | wc -l
 ```
 ```
-389
+388
 ```
+We submitted 4 samples with two replicate extractions, so this matches expectations.
 
-We originally submitted 392 samples, so 3 might have been dropped in the QC process?
+<br>
 
 
 
