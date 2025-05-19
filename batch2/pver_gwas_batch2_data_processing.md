@@ -640,7 +640,7 @@ for FILE in $(cat $BAMLIST); do
 done
 ```
 
-There are now 1544 bam files remaining.
+There are now **1544 bam files** remaining.
 
 <br>
 
