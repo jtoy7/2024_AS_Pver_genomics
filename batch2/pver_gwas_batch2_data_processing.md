@@ -655,3 +655,13 @@ ls | cut -f1-6 -d "_" | sort | uniq | wc -l
 772
 ```
 
+Double check number of unique extractions remaining:
+```bash
+cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
+
+ls | cut -f1-5 -d "_" | sort | uniq | wc -l
+```
+
+```
+380
+```
