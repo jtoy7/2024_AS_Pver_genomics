@@ -514,13 +514,124 @@ rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam'
 ```
 
 
+Run the `parse_bowtie2_output.sh` script to parse summary mapping statistics from each file. The output file is called bowtie_mapping_summary.tsv
+```bash
+#!/bin/bash
+
+ls *hologenome_mapping*.err > errfile_list.txt
+
+# create data file and add header if it is empty
+header="jobid\tsample\tconcordantly_0_times\tconcordantly_1_time\tconcordantly_2_or_more_times\toverall_rate" #assign header value
+outfile="bowtie_mapping_summary.tsv"
+
+if [ ! -s "$outfile" ]; then
+  # file is empty or does not exist
+    echo -e "$header" > "$outfile"
+fi
+
+for FILE in `cat errfile_list.txt`; do
+    # parse mapping rates from botwtie2 otuput
+    jobid=$(echo $FILE | cut -d "_" -f1,2)
+    sample=$(head -3 $jobid'_hologenome_mapping_array_pverbatch3_2025-05-15.out' | tail -1)
+    con0=$(grep -oP '\d+\.\d+%?' $jobid'_hologenome_mapping_array_pverbatch3_2025-05-15.err' | head -2 | tail -1)
+    con1=$(grep -oP '\d+\.\d+%?' $jobid'_hologenome_mapping_array_pverbatch3_2025-05-15.err' | head -3 | tail -1)
+    con2=$(grep -oP '\d+\.\d+%?' $jobid'_hologenome_mapping_array_pverbatch3_2025-05-15.err' | head -4 | tail -1)
+    overall=$(grep -oP '\d+\.\d+%? overall alignment rate' $jobid'_hologenome_mapping_array_pverbatch3_2025-05-15.err' | cut -d" " -f1)
+
+    # Append data to output file
+    echo -e "$jobid\t$sample\t$con0\t$con1\t$con2\t$overall" >> "$outfile"
+
+done
+```
+
+Check for low-mapping samples:
+```bash
+sort -V -k6,6 bowtie_mapping_summary.tsv | grep -v "Ahya" | less -S
+```
+
+```
+jobid   sample  concordantly_0_times    concordantly_1_time     concordantly_2_or_more_times    overall_rate
+
+```
+
+Most libraries had 70-90% mapping rate. The only libraries with really low mapping were the problematic AOAA_Pver_03 libraries (sample 823), which had little to no sequence data.
+
+
+Check duplicate rate of each library:
+`summarize_dedup.sh`
+```bash
+#!/bin/bash
+
+# Create output file
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/pver_gwas_batch3/bam/
+OUTFILE=$BAMDIR/dupstat_summary.tsv
+
+
+# Change working directory
+cd $BAMDIR
+
+# Print header
+echo -e "FILE\tLIBRARY\tUNPAIRED_READS_EXAMINED\tREAD_PAIRS_EXAMINED\tSECONDARY_OR_SUPPLEMENTARY_RDS\tUNMAPPED_READS\tUNPAIRED_READ_DUPLICATES\tREAD_PAIR_DUPLICATES\tREAD_PAIR_OPTICAL_DUPLICATES\tPERCENT_DUPLICATION\tESTIMATED_LIBRARY_SIZE" > $OUTFILE
+
+# Loop through all dupstat files
+for FILE in `ls *dupstat.txt`; do
+    # Extract the second line after the "## METRICS CLASS" line (i.e., the actual data)
+    DATA=$(awk '/^## METRICS CLASS/ {getline; getline; print}' "$FILE")
+
+    # Print data to outfile
+    echo -e "$FILE\t$DATA" >> $OUTFILE
+
+done
+```
+
+Check highest and lowest duplication rates:
+```bash
+cut -f1,2,10 dupstat_summary.tsv | sort -k3,3 -r | less -S
+```
+
+```
+FILE    LIBRARY  PERCENT_DUPLICATION
+
+```
+Most samples had **20-40% duplicates**.
+
+<br>
 
 
 
+Make list of deduped bam files:
+```bash
+cd $BASEDIR/pver_gwas/pver_gwas_batch3/bam
+
+# Exclude Ahya samples and AOAA_Pver_03
+ls *dedup_coordsorted.bam | grep -v "Ahya" | grep -v "AOAA_Pver_03" > $BASEDIR/pver_gwas/pver_gwas_batch3/sample_lists/first_dedup_bams_list.txt
+```
 
 
+## Create symbolic links (shortcuts) for BAM files in a new directory called `$BASEDIR/pver_gwas/hologenome_mapped_all/`
 
+```bash
+BAMDIR=$BASEDIR/pver_gwas/pver_gwas_batch3/bam
+BAMLIST=$BASEDIR/pver_gwas/pver_gwas_batch3/sample_lists/first_dedup_bams_list.txt
 
+for FILE in $(cat $BAMLIST); do
+  ln -s $BAMDIR/$FILE $BASEDIR/pver_gwas/hologenome_mapped_all/
+done
+```
+There are now 1544 bam files remaining.
+
+<br>
+
+Double check number of unique libraries remaining (should be half of the number of bam files):
+```bash
+cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
+
+ls | cut -f1-6 -d "_" | sort | uniq | wc -l
+```
+```
+
+```
 
 
 
@@ -546,9 +657,9 @@ rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam'
 module load container_env samtools
 
 ## Define some variables
-BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
-BAMDIR=$BASEDIR/ahya_gwas_pilot/its2_mapping_all
-OUTDIR=$BASEDIR/ahya_gwas_pilot/its2_mapping_all/merged_bams
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/hologenome_mapped_all
+OUTDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams
 SAMPLELIST=($(ls $BAMDIR/*.bam | sed -E 's/.*\/([A-Z]{4}_P[A-Z]{3}_[0-9]+_[12]_[ABC])_.*/\1/' | sort | uniq))
 REFBASENAME=combined_pver_cd_hologenome
 
@@ -573,7 +684,7 @@ echo $BAMFILES
 echo $SLURM_JOB_ID
 
 # Define the output merged BAM file name
-MERGEDBAM=$OUTDIR/$SAMPLE'_1_'$REFBASENAME'_merged.bam'
+MERGEDBAM=$OUTDIR/$SAMPLE'_'$REFBASENAME'_merged.bam'
 
 
 # Merge the BAM files for the sample
@@ -582,5 +693,8 @@ crun.samtools samtools merge -f -@ 16 "$MERGEDBAM" $BAMFILES
 
 
 echo "Merging complete for $SAMPLE!"
+```
+
+```bash
 sbatch merge_bams_by_sample_array.slurm
 ```
