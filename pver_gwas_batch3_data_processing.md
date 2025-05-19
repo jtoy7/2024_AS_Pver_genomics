@@ -660,7 +660,7 @@ module load container_env samtools
 BASEDIR=/archive/barshis/barshislab/jtoy/
 BAMDIR=$BASEDIR/pver_gwas/hologenome_mapped_all
 OUTDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams
-SAMPLELIST=($(ls $BAMDIR/*.bam | sed -E 's/.*\/([A-Z]{4}_P[A-Z]{3}_[0-9]+_[12]_[ABC])_.*/\1/' | sort | uniq))
+SAMPLELIST=($(ls $BAMDIR/*.bam | sed -E 's/.*\/2024_([A-Z]{3}._P[a-z]{3}_[0-9A-Za-z]+_[12])_.*/\1/' | sort | uniq))
 REFBASENAME=combined_pver_cd_hologenome
 
 
