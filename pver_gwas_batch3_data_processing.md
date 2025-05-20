@@ -831,7 +831,7 @@ echo "done-zo woot!"
 
 <br>
 
-Calculate depth/coverage statistics with CollectWgsMetrics:
+## Calculate depth/coverage statistics with CollectWgsMetrics:
 `CollectWgsMetrics_array.slurm`
 ```bash
 #!/bin/bash
