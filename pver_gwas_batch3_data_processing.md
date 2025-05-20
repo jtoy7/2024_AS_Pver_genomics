@@ -649,7 +649,7 @@ ls | cut -f1-6 -d "_" | sort | uniq | wc -l
 #SBATCH --partition=main
 #SBATCH --array=1-780%110
 #SBATCH --ntasks=1
-#SBATCH --mem=100G
+#SBATCH --mem=30G
 #SBATCH --time 5-00:00:00
 #SBATCH --cpus-per-task=16
 
@@ -697,4 +697,179 @@ echo "Merging complete for $SAMPLE!"
 
 ```bash
 sbatch merge_bams_by_sample_array.slurm
+```
+
+
+## Query-sort, deduplicate, and then coordinate-sort the merged bams:
+`dedup_merged_bams_array.slurm`
+```bash
+#!/bin/bash
+
+#SBATCH --job-name dedup_merged_bams_array_2025-05-22
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-380%110
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 5-00:00:00
+
+
+## Load modules
+module load container_env
+module load container_env gatk
+GATK='crun.gatk gatk'
+
+## Define some variables
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams
+OUTDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams
+SAMPLELIST=$BASEDIR/pver_gwas/hologenome_mapped_all/sample_lists/merged_bams_list.txt
+
+## Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+## Select the SAMPLE from the SAMPLELIST
+SAMPLEFILE=`head $SAMPLELIST -n $SLURM_ARRAY_TASK_ID | tail -n 1`
+
+## Keep record of sample file
+echo $SAMPLEFILE
+
+## Make directory
+mkdir -p $OUTDIR
+
+
+## Query-sort for duplicate removal with GATK
+# Run SortSam to sort by query name and convert to BAM
+$GATK --java-options "-Xmx100G" SortSam \
+  --INPUT $BAMDIR/$SAMPLEFILE \
+  --OUTPUT $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
+  --SORT_ORDER queryname
+
+# Run validation of BAM file
+$GATK --java-options "-Xmx100G" ValidateSamFile \
+  -I $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
+  -O $BAMDIR/${SAMPLEFILE%.*}'_qsorted.val' \
+  -M VERBOSE
+
+## Mark and remove duplicates
+$GATK --java-options "-Xmx100G" MarkDuplicates \
+  -I $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
+  -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
+  --METRICS_FILE $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dupstat.txt' \
+  --REMOVE_DUPLICATES true
+
+## Run validation of BAM file
+$GATK --java-options "-Xmx100G" ValidateSamFile \
+  -I $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
+  -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.val' \
+  -M VERBOSE
+  
+## Remove qsorted BAM files to make space
+rm $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam'
+
+## Run SortSam to sort by coordinate for downstream processing
+$GATK --java-options "-Xmx100G" SortSam \
+  --INPUT $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
+  --OUTPUT $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.bam' \
+  --SORT_ORDER coordinate
+
+## Run validation of coordinate-sorted BAM file
+$GATK --java-options "-Xmx100G" ValidateSamFile \
+  -I $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.bam' \
+  -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.val' \
+  -M VERBOSE
+  
+## Remove qsorted deduped BAM files to make space
+rm $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam'
+```
+
+<br>
+
+## Count alignments remaining post dedup
+`count_postdedup_reads_array.slurm`
+```bash
+#!/bin/bash
+#SBATCH --job-name count_postdedup_reads_array_2024-05-23
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-380%100
+#SBATCH --ntasks=1
+#SBATCH --mem=30G
+#SBATCH --time 5-00:00:00
+
+
+## Load modules
+module load container_env samtools
+
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMLIST=$BASEDIR/pver_gwas/hologenome_mapped_all/sample_lists/dedup_bams_coordsorted_list.txt
+
+## Change working directory
+cd $BASEDIR/pver_gwas/hologenome_mapped_all/dedup_bams
+
+## Loop over each sample
+# for SAMPLEBAM in `cat $BAMLIST`; do
+
+SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID},1p" $BAMLIST)
+echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
+echo Sample bam is $SAMPLEBAM
+
+
+COUNT=`crun.samtools samtools view -@16 $SAMPLEBAM | wc -l`
+
+echo -e "$SAMPLEBAM\t$COUNT" >> postdedup_read_counts.txt
+
+
+echo "done-zo woot!"
+```
+
+<br>
+
+Calculate depth/coverage statistics with CollectWgsMetrics:
+`CollectWgsMetrics_array.slurm`
+```bash
+#!/bin/bash
+#SBATCH --job-name CollectWgsMetrics_array_2025-05-24
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-380%110
+#SBATCH --ntasks=1
+#SBATCH --mem=30G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=20
+
+
+## Load modules
+module load container_env gatk
+
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMLIST=$BASEDIR/pver_gwas/hologenome_mapped_all/sample_lists/dedup_bams_coordsorted_list.txt
+GATK='crun.gatk gatk'
+REFERENCE=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/combined_pver_cd_hologenome.fa
+
+
+## Loop over each sample
+# for SAMPLEBAM in `cat $BAMLIST`; do
+
+SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID},1p" $BAMLIST)
+echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
+echo Sample bam is $SAMPLEBAM
+
+
+## Run CollectWgsMetrics
+$GATK --java-options "-Xmx100G" CollectWgsMetrics \
+  --INPUT $BASEDIR'/pver_gwas/hologenome_mapped_all/dedup_bams/'$SAMPLEBAM \
+  --OUTPUT $BASEDIR'/pver_gwas/hologenome_mapped_all/dedup_bams/'${SAMPLEBAM%.*}'_metrics.txt' \
+  --REFERENCE_SEQUENCE $REFERENCE
+
+echo 'done-zo woot!'
 ```
