@@ -512,7 +512,7 @@ $GATK --java-options "-Xmx100G" ValidateSamFile \
 #remove old BAM files
 rm $SAMPLEOUT'_bt2_'$REFBASENAME'_reheadered_qsorted_dedup.bam'
 ```
-
+This took about **10 days** to complete running 110 array jobs simultaneously. Only one job failed: `4432526_2104`, corresponding to `24392Brs_2024-ASGWAS-S08-Pver-07-707-B_R24196_S589_L006`. It appears that it ran out of memory during the deduplication step, even though 100GB was allocated. I reran this sample alone, this time allocating 120GB and using 38 threads for the bowtie step instead of 16. This script is called `hologenome_mapping_sample707redo.slurm`.
 
 Run the `parse_bowtie2_output.sh` script to parse summary mapping statistics from each file. The output file is called bowtie_mapping_summary.tsv
 ```bash
