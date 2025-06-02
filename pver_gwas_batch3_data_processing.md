@@ -553,11 +553,49 @@ sort -V -k6,6 bowtie_mapping_summary.tsv | grep -v "Ahya" | less -S
 
 ```
 jobid   sample  concordantly_0_times    concordantly_1_time     concordantly_2_or_more_times    overall_rate
-
+4432526_2775    2024_AOAA_Pver_03_1_A_R24196_L001       100.00% 0.00%   0.00%   0.00%
+4432526_2776    2024_AOAA_Pver_03_1_A_R24196_L002       100.00% 0.00%   0.00%   0.00%
+4432526_2777    2024_AOAA_Pver_03_1_A_R24196_L003       4.5     0.0     4.5     0.00%
+4432526_2778    2024_AOAA_Pver_03_1_A_R24196_L004       4.5     0.0     4.5     0.00%
+4432526_2782    2024_AOAA_Pver_03_1_B_R24196_L008       99.72%  0.28%   0.00%   4.65%
+4432526_2779    2024_AOAA_Pver_03_1_B_R24196_L005       99.42%  0.29%   0.29%   6.05%
+4432526_2780    2024_AOAA_Pver_03_1_B_R24196_L006       99.72%  0.28%   0.00%   6.13%
+4432526_2781    2024_AOAA_Pver_03_1_B_R24196_L007       100.00% 0.00%   0.00%   6.14%
+4432526_1500    2024_OFU3_Pver_14_1_A_R24196_L002       50.00%  0.00%   50.00%  50.00%
+4432526_1496    2024_OFU3_Pver_13_1_B_R24196_L006       47.57%  33.94%  18.48%  63.32%
+4432526_1495    2024_OFU3_Pver_13_1_B_R24196_L005       47.23%  34.17%  18.60%  63.46%
+4432526_1498    2024_OFU3_Pver_13_1_B_R24196_L008       47.45%  34.03%  18.53%  63.51%
+4432526_1497    2024_OFU3_Pver_13_1_B_R24196_L007       47.20%  34.20%  18.60%  63.55%
+4432526_1493    2024_OFU3_Pver_13_1_A_R24196_L003       45.18%  35.34%  19.49%  63.86%
+4432526_1494    2024_OFU3_Pver_13_1_A_R24196_L004       45.04%  35.39%  19.57%  63.88%
+4432526_1492    2024_OFU3_Pver_13_1_A_R24196_L002       44.93%  35.52%  19.55%  63.99%
+4432526_1491    2024_OFU3_Pver_13_1_A_R24196_L001       44.95%  35.50%  19.56%  64.10%
+4432526_1160    2024_MALO_Pver_11_1_B_R24196_L006       39.16%  39.10%  21.73%  69.35%
+4432526_1159    2024_MALO_Pver_11_1_B_R24196_L005       39.00%  39.20%  21.80%  69.42%
+.
+.
+.
+4432526_2753    2024_FASA_Pspp_Extra4_1_A_R24196_L003   20.93%  52.77%  26.30%  89.82%
+4432526_2754    2024_FASA_Pspp_Extra4_1_A_R24196_L004   20.78%  52.85%  26.37%  89.84%
+4432526_2752    2024_FASA_Pspp_Extra4_1_A_R24196_L002   20.71%  52.93%  26.36%  89.85%
+4432526_2751    2024_FASA_Pspp_Extra4_1_A_R24196_L001   20.83%  52.88%  26.28%  89.88%
+4432526_3110    2024_FMAL_Pspp_Extra1_1_A_R24196_L004   17.10%  54.17%  28.73%  90.00%
+4432526_3109    2024_FMAL_Pspp_Extra1_1_A_R24196_L003   16.67%  54.70%  28.64%  90.23%
+4432526_1605    2024_OFU3_Pver_27_1_A_R24196_L003       18.75%  49.43%  31.82%  90.34%
+4432526_1502    2024_OFU3_Pver_14_1_A_R24196_L004       16.67%  33.33%  50.00%  91.67%
+4432526_1499    2024_OFU3_Pver_14_1_A_R24196_L001       0.00%   100.00% 0.00%   100.00%
+4432526_1501    2024_OFU3_Pver_14_1_A_R24196_L003       0.00%   14.29%  85.71%  100.00%
+4432526_429     2024_LEON_Pver_11_1_B_R24196_L005       0.00%   100.00% 0.00%   100.00%
+4432526_430     2024_LEON_Pver_11_1_B_R24196_L006       0.00%   90.91%  9.09%   100.00%
 ```
 
-Most libraries had 70-90% mapping rate. The only libraries with really low mapping were the problematic AOAA_Pver_03 libraries (sample 823), which had little to no sequence data.
+Most libraries had 80-90% mapping rate.
+The only libraries with really low mapping were the problematic `AOAA_Pver_03` libraries (sample 823), which had little to no sequence data.
+`LEON_Pver_11_1_B` and `OFU3_Pver_14_1_A` also had essentially no data.
+`OFU3_Pver_27_1_A_R24196_L003` had only 176 reads.
+`2024_FMAL_Pspp_Extra1_1_A` libraries had only about 2000 reads per lane, but B and C libraries looked good.
 
+<br>
 
 Check duplicate rate of each library:
 `summarize_dedup.sh`
@@ -589,11 +627,38 @@ done
 
 Check highest and lowest duplication rates:
 ```bash
-cut -f1,2,10 dupstat_summary.tsv | sort -k3,3 -r | less -S
+cut -f1,2,4,10 dupstat_summary.tsv | sort -k4,4 -r | less -S
 ```
 
 ```
-FILE    LIBRARY  PERCENT_DUPLICATION
+
+FILE    LIBRARY     READ_PAIRS_EXAMINED     PERCENT_DUPLICATION
+2024_OFU3_Pver_14_1_A_R24196_L003_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU3_Pver_14       7       0.714286
+2024_LEON_Pver_11_1_B_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Pver_11       11      0.545455
+2024_FTEL_Pver_14_1_B_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_FTEL_Pver_14       10419159        0.435372
+2024_OFU6_Pver_21_1_B_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU6_Pver_21       4929755 0.432997
+2024_FTEL_Pver_31_1_C_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_FTEL_Pver_31       4901830 0.432441
+2024_VATI_Pver_04_1_B_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_VATI_Pver_04       7895108 0.431617
+2024_FTEL_Pver_27_1_C_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_FTEL_Pver_27       5560226 0.431447
+2024_AOAA_Pver_17_1_B_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_17       7127156 0.43059
+2024_FALU_Pver_12_1_B_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_FALU_Pver_12       9529413 0.429456
+2024_OFU3_Pver_22_1_B_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU3_Pver_22       6888683 0.428907
+.
+.
+.
+2024_LEON_Pver_03_1_B_R24196_L005_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Pver_03       1504826 0.135624
+2024_LEON_Pver_03_1_B_R24196_L007_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Pver_03       1506493 0.134433
+2024_LEON_Pver_03_1_B_R24196_L008_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Pver_03       1487780 0.132482
+2024_AOAA_Pver_03_1_B_R24196_L007_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0       0.046512
+2024_OFU3_Pver_14_1_A_R24196_L002_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_OFU3_Pver_14       1       0
+2024_LEON_Pver_11_1_B_R24196_L005_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_LEON_Pver_11       1       0
+2024_AOAA_Pver_03_1_B_R24196_L008_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       1       0
+2024_AOAA_Pver_03_1_B_R24196_L006_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       1       0
+2024_AOAA_Pver_03_1_B_R24196_L005_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       2       0
+2024_AOAA_Pver_03_1_A_R24196_L004_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0       0
+2024_AOAA_Pver_03_1_A_R24196_L003_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0       0
+2024_AOAA_Pver_03_1_A_R24196_L002_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0       0
+2024_AOAA_Pver_03_1_A_R24196_L001_bt2_combined_pver_cd_hologenome_reheadered_qsorted_dupstat.txt        2024_AOAA_Pver_03       0       0
 
 ```
 Most samples had **20-40% duplicates**.
@@ -609,7 +674,9 @@ cd $BASEDIR/pver_gwas/pver_gwas_batch3/bam
 # Exclude Ahya samples and AOAA_Pver_03
 ls *dedup_coordsorted.bam | grep -v "Ahya" | grep -v "AOAA_Pver_03" > $BASEDIR/pver_gwas/pver_gwas_batch3/sample_lists/first_dedup_bams_list.txt
 ```
+This leaves 3086 BAM files.
 
+<br>
 
 ## Create symbolic links (shortcuts) for BAM files in a new directory called `$BASEDIR/pver_gwas/hologenome_mapped_all/`
 
@@ -621,39 +688,52 @@ for FILE in $(cat $BAMLIST); do
   ln -s $BAMDIR/$FILE $BASEDIR/pver_gwas/hologenome_mapped_all/
 done
 ```
-There are now 1544 bam files remaining.
+There are now a total of 4630 bam files linked to this directory.
 
 <br>
 
-Double check number of unique libraries remaining (should be half of the number of bam files):
+Double check number of unique libraries remaining:
 ```bash
 cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
 
-ls | cut -f1-6 -d "_" | sort | uniq | wc -l
+ls *.bam | cut -f1-6 -d "_" | sort | uniq | wc -l
 ```
 ```
+772
+```
+772 libraries, 14 of which are C libraries.
 
+<br>
+
+Double check number of unique extractions remaining:
+```bash
+
+```bash
+cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
+
+ls *.bam | cut -f1-5 -d "_" | sort | uniq | wc -l
+```
+380
 ```
 
-
-
+<br>
 
 
 ## Run script `merge_bams_by_sample_array.slurm` to merge bams from the 2 different batches (4 + 8 = 12 lanes per library) by sample
 ```bash
 #!/bin/bash
 
-#SBATCH --job-name=merge_its2_bams_by_sample_2025-05-20
+#SBATCH --job-name=merge_bams_by_sample_2025-06-02
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
-#SBATCH --array=1-780%110
+#SBATCH --array=1-380%110
 #SBATCH --ntasks=1
 #SBATCH --mem=30G
 #SBATCH --time 5-00:00:00
-#SBATCH --cpus-per-task=16
+
 
 ## Load modules
 module load container_env samtools
