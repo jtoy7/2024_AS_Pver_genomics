@@ -707,11 +707,10 @@ ls *.bam | cut -f1-6 -d "_" | sort | uniq | wc -l
 
 Double check number of unique extractions remaining:
 ```bash
-
-```bash
 cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
 
 ls *.bam | cut -f1-5 -d "_" | sort | uniq | wc -l
+```
 ```
 380
 ```
@@ -757,7 +756,7 @@ SAMPLE="${SAMPLELIST[$SLURM_ARRAY_TASK_ID-1]}"
 echo $SAMPLE
 
 # List the BAM files for the current sample
-BAMFILES=$(ls $BAMDIR/${SAMPLE}_*.bam)
+BAMFILES=$(ls $BAMDIR/'2024_'$SAMPLE'_'*'.bam')
 
 # Keep record of BAM files
 echo $BAMFILES
@@ -766,7 +765,7 @@ echo $BAMFILES
 echo $SLURM_JOB_ID
 
 # Define the output merged BAM file name
-MERGEDBAM=$OUTDIR/$SAMPLE'_'$REFBASENAME'_merged.bam'
+MERGEDBAM=$OUTDIR/'2024_'$SAMPLE'_'$REFBASENAME'_merged.bam'
 
 
 # Merge the BAM files for the sample
