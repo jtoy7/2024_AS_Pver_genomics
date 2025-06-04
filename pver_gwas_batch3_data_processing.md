@@ -780,13 +780,20 @@ echo "Merging complete for $SAMPLE!"
 sbatch merge_bams_by_sample_array.slurm
 ```
 
+### Make list of merged bam files
+```bash
+cd $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams
+
+ls *merged.bam > ../sample_lists/merged_bams_list.txt
+```
+
 
 ## Query-sort, deduplicate, and then coordinate-sort the merged bams:
 `dedup_merged_bams_array.slurm`
 ```bash
 #!/bin/bash
 
-#SBATCH --job-name dedup_merged_bams_array_2025-05-22
+#SBATCH --job-name dedup_merged_bams_array_2025-06-03
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
@@ -794,7 +801,7 @@ sbatch merge_bams_by_sample_array.slurm
 #SBATCH --partition=main
 #SBATCH --array=1-380%110
 #SBATCH --ntasks=1
-#SBATCH --mem=100G
+#SBATCH --mem=120G
 #SBATCH --time 5-00:00:00
 
 
@@ -824,26 +831,26 @@ mkdir -p $OUTDIR
 
 ## Query-sort for duplicate removal with GATK
 # Run SortSam to sort by query name and convert to BAM
-$GATK --java-options "-Xmx100G" SortSam \
+$GATK --java-options "-Xmx120G" SortSam \
   --INPUT $BAMDIR/$SAMPLEFILE \
   --OUTPUT $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
   --SORT_ORDER queryname
 
 # Run validation of BAM file
-$GATK --java-options "-Xmx100G" ValidateSamFile \
+$GATK --java-options "-Xmx120G" ValidateSamFile \
   -I $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
   -O $BAMDIR/${SAMPLEFILE%.*}'_qsorted.val' \
   -M VERBOSE
 
 ## Mark and remove duplicates
-$GATK --java-options "-Xmx100G" MarkDuplicates \
+$GATK --java-options "-Xmx120G" MarkDuplicates \
   -I $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
   -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
   --METRICS_FILE $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dupstat.txt' \
   --REMOVE_DUPLICATES true
 
 ## Run validation of BAM file
-$GATK --java-options "-Xmx100G" ValidateSamFile \
+$GATK --java-options "-Xmx120G" ValidateSamFile \
   -I $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
   -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.val' \
   -M VERBOSE
@@ -852,13 +859,13 @@ $GATK --java-options "-Xmx100G" ValidateSamFile \
 rm $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam'
 
 ## Run SortSam to sort by coordinate for downstream processing
-$GATK --java-options "-Xmx100G" SortSam \
+$GATK --java-options "-Xmx120G" SortSam \
   --INPUT $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
   --OUTPUT $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.bam' \
   --SORT_ORDER coordinate
 
 ## Run validation of coordinate-sorted BAM file
-$GATK --java-options "-Xmx100G" ValidateSamFile \
+$GATK --java-options "-Xmx120G" ValidateSamFile \
   -I $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.bam' \
   -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.val' \
   -M VERBOSE
@@ -869,17 +876,57 @@ rm $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam'
 
 <br>
 
+Check duplicate rate of each library:
+`summarize_dedup.sh`
+```bash
+#!/bin/bash
+
+# Create output file
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/
+OUTFILE=$BAMDIR/dupstat_summary.tsv
+
+
+# Change working directory
+cd $BAMDIR
+
+# Print header
+echo -e "FILE\tLIBRARY\tUNPAIRED_READS_EXAMINED\tREAD_PAIRS_EXAMINED\tSECONDARY_OR_SUPPLEMENTARY_RDS\tUNMAPPED_READS\tUNPAIRED_READ_DUPLICATES\tREAD_PAIR_DUPLICATES\tREAD_PAIR_OPTICAL_DUPLICATES\tPERCENT_DUPLICATION\tESTIMATED_LIBRARY_SIZE" > $OUTFILE
+
+# Loop through all dupstat files
+for FILE in `ls *dupstat.txt`; do
+    # Extract the second line after the "## METRICS CLASS" line (i.e., the actual data)
+    DATA=$(awk '/^## METRICS CLASS/ {getline; getline; print}' "$FILE")
+
+    # Print data to outfile
+    echo -e "$FILE\t$DATA" >> $OUTFILE
+
+done
+```
+**2-5% of reads** were identified as duplicates from each merged bam file.
+
+<br>
+
+### Make list of deduped merged bam files
+```bash
+cd $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams
+
+ls *qsorted_dedup_coordsorted.bam > ../../sample_lists/dedup_bams_coordsorted_list.txt
+```
+
+<br>
+
 ## Count alignments remaining post dedup
 `count_postdedup_reads_array.slurm`
 ```bash
 #!/bin/bash
-#SBATCH --job-name count_postdedup_reads_array_2024-05-23
+#SBATCH --job-name count_postdedup_reads_array_2025-06-04
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
-#SBATCH --array=1-380%100
+#SBATCH --array=1-380%110
 #SBATCH --ntasks=1
 #SBATCH --mem=30G
 #SBATCH --time 5-00:00:00
@@ -892,22 +939,62 @@ BASEDIR=/archive/barshis/barshislab/jtoy/
 BAMLIST=$BASEDIR/pver_gwas/hologenome_mapped_all/sample_lists/dedup_bams_coordsorted_list.txt
 
 ## Change working directory
-cd $BASEDIR/pver_gwas/hologenome_mapped_all/dedup_bams
+cd $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams
+
 
 ## Loop over each sample
-# for SAMPLEBAM in `cat $BAMLIST`; do
-
 SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID},1p" $BAMLIST)
 echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
 echo Sample bam is $SAMPLEBAM
 
 
-COUNT=`crun.samtools samtools view -@16 $SAMPLEBAM | wc -l`
+# Count mapped reads
+COUNT=`crun.samtools samtools view -@16 -F 4 $SAMPLEBAM | wc -l`
 
-echo -e "$SAMPLEBAM\t$COUNT" >> postdedup_read_counts.txt
+echo -e "$SAMPLEBAM\t$COUNT" > $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/${SAMPLEBAM%.*}_mappedcount.txt
 
 
 echo "done-zo woot!"
+```
+
+
+Compile individual counts:
+```bash
+echo -e "Sample\tMapped_read_count" > postdedup_mapped_read_counts.txt
+cat *mappedcount.txt >> postdedup_mapped_read_counts.txt
+```
+
+<br>
+
+Check mapped read counts:
+```bash
+sort -V -k2,2 postdedup_mapped_read_counts.txt | less
+```
+```
+Sample  Mapped_read_count
+2024_OFU3_Pver_24_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    49135709
+2024_OFU3_Pver_11_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    53602320
+2024_OFU3_Pver_05_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    55839027
+2024_OFU3_Pver_07_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    58540183
+2024_OFU3_Pver_16_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    67105148
+2024_OFU3_Pver_12_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    67352324
+2024_OFU3_Pver_14_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    71918578
+2024_FASA_Pver_34_2_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    77231526
+2024_ALOF_Pver_27_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    81733000
+2024_ALOF_Pver_26_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    84190748
+.
+.
+.
+2024_FALU_Pver_33_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    206807809
+2024_AOAA_Pver_14_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    216418108
+2024_VATI_Pver_11_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    220963239
+2024_VATI_Pver_08_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    228070385
+2024_FTEL_Pver_38_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    229796295
+2024_OFU3_Pver_27_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    233646488
+2024_LEON_Pver_07_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    233696810
+2024_MALO_Pver_03_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    233794473
+2024_VATI_Pver_15_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    240919552
+2024_ALOF_Pver_05_1_combined_pver_cd_hologenome_merged_qsorted_dedup_coordsorted.bam    293207462
 ```
 
 <br>
@@ -916,7 +1003,7 @@ echo "done-zo woot!"
 `CollectWgsMetrics_array.slurm`
 ```bash
 #!/bin/bash
-#SBATCH --job-name CollectWgsMetrics_array_2025-05-24
+#SBATCH --job-name CollectWgsMetrics_hologenome_array_2025-06-04
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
@@ -924,9 +1011,9 @@ echo "done-zo woot!"
 #SBATCH --partition=main
 #SBATCH --array=1-380%110
 #SBATCH --ntasks=1
-#SBATCH --mem=30G
-#SBATCH --time 5-00:00:00
-#SBATCH --cpus-per-task=20
+#SBATCH --mem=110G
+#SBATCH --time 7-00:00:00
+
 
 
 ## Load modules
@@ -939,7 +1026,6 @@ REFERENCE=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/combine
 
 
 ## Loop over each sample
-# for SAMPLEBAM in `cat $BAMLIST`; do
 
 SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID},1p" $BAMLIST)
 echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
@@ -947,9 +1033,9 @@ echo Sample bam is $SAMPLEBAM
 
 
 ## Run CollectWgsMetrics
-$GATK --java-options "-Xmx100G" CollectWgsMetrics \
-  --INPUT $BASEDIR'/pver_gwas/hologenome_mapped_all/dedup_bams/'$SAMPLEBAM \
-  --OUTPUT $BASEDIR'/pver_gwas/hologenome_mapped_all/dedup_bams/'${SAMPLEBAM%.*}'_metrics.txt' \
+$GATK --java-options "-Xmx110G" CollectWgsMetrics \
+  --INPUT $BASEDIR'/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/'$SAMPLEBAM \
+  --OUTPUT $BASEDIR'/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/'${SAMPLEBAM%.*}'_metrics.txt' \
   --REFERENCE_SEQUENCE $REFERENCE
 
 echo 'done-zo woot!'
