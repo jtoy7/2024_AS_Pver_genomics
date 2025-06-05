@@ -1163,6 +1163,36 @@ echo -e "Sample\tPver_mapped_read_count" > pver_mapped_read_counts.txt
 cat *pvercount.txt >> pver_mapped_read_counts.txt
 ```
  <br>
+```bash
+sort -V -k2,2 pver_mapped_read_counts.txt | less
+```
+
+```
+Sample  Pver_mapped_read_count
+2024_OFU3_Pver_24_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      25308146
+2024_OFU3_Pver_05_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      27316694
+2024_OFU3_Pver_11_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      28248246
+2024_OFU3_Pver_07_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      29778938
+2024_OFU3_Pver_16_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      33678558
+2024_OFU3_Pver_12_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      34319626
+2024_OFU3_Pver_14_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      37190408
+2024_FASA_Pver_34_2_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      39548008
+2024_ALOF_Pver_27_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      40940074
+2024_ALOF_Pver_26_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      42459216
+.
+.
+.
+2024_FALU_Pver_33_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      104546770
+2024_AOAA_Pver_14_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      113136116
+2024_VATI_Pver_11_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      114869950
+2024_LEON_Pver_07_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      117219424
+2024_FTEL_Pver_38_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      119316852
+2024_VATI_Pver_08_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      119600210
+2024_OFU3_Pver_27_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      124563044
+2024_MALO_Pver_03_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      125612594
+2024_VATI_Pver_15_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      130513866
+2024_ALOF_Pver_05_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam      154967226
+```
  
 ### Calculate percent host reads
 ```bash
@@ -1203,3 +1233,5 @@ sort -k4,4 pver_mapped_read_percents.txt | less
 | 2024_AOAA_Pver_18_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           44,944,396   |              91,530,559 | 0.491032           |
 | 2024_FTEL_Pspp_Extra4_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam |           84,261,370   |             171,551,884 | 0.491171           |
 | 2024_AOAA_Pver_17_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           51,694,440   |             105,192,387 | 0.491428           |
+
+Percent of mapped reads that concordantly map to Pver contigs ranges from 48-60%
