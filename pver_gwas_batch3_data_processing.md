@@ -1162,4 +1162,44 @@ Compile counts
 echo -e "Sample\tPver_mapped_read_count" > pver_mapped_read_counts.txt
 cat *pvercount.txt >> pver_mapped_read_counts.txt
 ```
+ <br>
  
+### Calculate percent host reads
+```bash
+BASEDIR=/archive/barshis/barshislab/jtoy/
+
+# first sort counts files
+tail -n +2 $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/postdedup_mapped_read_counts.txt | sort -k1,1 >  $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/postdedup_mapped_read_counts_sorted.txt
+tail -n +2 $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/pver_mapped_read_counts.txt | sort -k1,1 > $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/pver_mapped_read_counts_sorted.txt
+
+# make sure first column of both files are identical
+diff <(cut -f1 $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/postdedup_mapped_read_counts_sorted.txt | cut -f1-5 -d "_") \
+     <(cut -f1 $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/pver_mapped_read_counts_sorted.txt | cut -f1-5 -d "_")
+
+# paste columns together
+paste <(cut -f1 "$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/pver_mapped_read_counts_sorted.txt") \
+      <(cut -f2 "$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/pver_mapped_read_counts_sorted.txt") \
+      <(cut -f2 "$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/postdedup_mapped_read_counts_sorted.txt") \
+      > "$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/pver_and_total_mapped_read_counts.txt"
+
+# calculate percentages
+awk '{print $0, $2/$3}' \
+    "$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/pver_and_total_mapped_read_counts.txt" \
+    > "$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/pver_mapped_read_percents.txt"
+```
+
+```bash
+sort -k4,4 pver_mapped_read_percents.txt | less
+```
+| Sample                                                                         | Pver_mapped_read_count | Total_mapped_read_count | Percent_pver_reads |
+|--------------------------------------------------------------------------------|------------------------|-------------------------|--------------------|
+| 2024_LEON_Pver_11_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           51,437,792   |             106,691,465 | 0.482117           |
+| 2024_OFU3_Pver_05_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           27,316,694   |              55,839,027 | 0.489204           |
+| 2024_ALOF_Pspp_Extra1_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam |           62,531,432   |             127,636,414 | 0.489918           |
+| 2024_AOAA_Pspp_Extra7_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam |           48,211,304   |              98,394,731 | 0.489979           |
+| 2024_FTEL_Pver_13_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           53,235,276   |             108,582,167 | 0.490276           |
+| 2024_AOAA_Pver_34_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           68,500,054   |             139,624,415 | 0.490602           |
+| 2024_MALO_Pver_26_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           55,815,728   |             113,693,234 | 0.490933           |
+| 2024_AOAA_Pver_18_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           44,944,396   |              91,530,559 | 0.491032           |
+| 2024_FTEL_Pspp_Extra4_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam |           84,261,370   |             171,551,884 | 0.491171           |
+| 2024_AOAA_Pver_17_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           51,694,440   |             105,192,387 | 0.491428           |
