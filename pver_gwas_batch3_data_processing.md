@@ -1040,3 +1040,126 @@ $GATK --java-options "-Xmx110G" CollectWgsMetrics \
 
 echo 'done-zo woot!'
 ```
+
+<br>
+
+
+## Extract only host (Pver) alignments:
+Filter bams using `select_host_alignments_array.slurm` script:
+
+```bash
+#!/bin/bash
+
+#SBATCH --job-name select_host_alignments_array_2025-06-04
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-380%110
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 10-00:00:00
+
+
+
+
+## Define some variables
+BASEDIR=/archive/barshis/barshislab/jtoy/
+OUTDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams
+SAMPLELIST=$BASEDIR/pver_gwas/hologenome_mapped_all/sample_lists/dedup_bams_coordsorted_list.txt # Path to a bam list
+REFBASENAME=PverCD
+SCAFLIST=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/Pver_scaffold_names_singleline.txt
+
+
+# Make new directory
+mkdir -p $OUTDIR
+
+## Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+## Select the SAMPLE from the SAMPLELIST
+SAMPLEFILE=`head $SAMPLELIST -n $SLURM_ARRAY_TASK_ID | tail -n 1`
+
+## Keep record of sample file
+echo $SAMPLEFILE
+
+## Define the output file name
+HOSTOUT=${SAMPLEFILE%combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam}$REFBASENAME'_dedup_primary_minq20_mlen20_pver.bam'
+
+# Load module
+module load container_env samtools
+
+
+#index sorted BAM
+crun.samtools samtools index -@ 16 $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/$SAMPLEFILE
+
+# Extract mappings that are primary alignments only (no unmapped or secondary/supplementary reads), with mapping score > 20, mapping length (CIGAR) > 20, and only on host scaffolds. Then extract only reads that aligned concordantly (-f 2)
+crun.samtools samtools view -b -F 260 -q 20 -m 20 -@ 16 $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/$SAMPLEFILE `cat $SCAFLIST` | crun.samtools samtools view -@ 16 -f 2 -b -o $OUTDIR/$HOSTOUT
+
+# Remove Cgoreaui and Dtrenchii sequence header lines, then reheader bam
+crun.samtools samtools view -H $OUTDIR/$HOSTOUT | sed -e '/Cgoreaui/d' -e '/Dtrenchii/d' > $OUTDIR/'header_'$SLURM_ARRAY_TASK_ID'.sam'
+
+crun.samtools samtools reheader $OUTDIR/'header_'$SLURM_ARRAY_TASK_ID'.sam' $OUTDIR/$HOSTOUT > $OUTDIR/${HOSTOUT%.*}'_reheadered.bam'
+
+# Remove original bam file
+rm $OUTDIR/$HOSTOUT
+```
+
+<br>
+
+Make list of Pver bams:
+```bash
+cd $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/
+ls *.bam > ../../../sample_lists/pver_bams_list.txt
+```
+
+<br>
+
+Count host (Pver) reads:
+`count_host_reads_array.slurm`
+```bash
+#!/bin/bash
+#SBATCH --job-name count_host_reads_array_2025-06-05
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-380%110
+#SBATCH --ntasks=1
+#SBATCH --mem=30G
+#SBATCH --time 5-00:00:00
+
+
+## Load modules
+module load container_env samtools
+
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMLIST=$BASEDIR/pver_gwas/hologenome_mapped_all/sample_lists/pver_bams_list.txt
+
+## Change working directory
+cd $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams
+
+
+## Loop over each sample
+SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID},1p" $BAMLIST)
+echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
+echo Sample bam is $SAMPLEBAM
+
+
+# Count mapped reads
+COUNT=`crun.samtools samtools view -@16 -F 4 $SAMPLEBAM | wc -l`
+
+echo -e "$SAMPLEBAM\t$COUNT" > $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/${SAMPLEBAM%.*}_pvercount.txt
+
+
+echo "done-zo woot!"
+```
+
+Compile counts
+```bash
+echo -e "Sample\tPver_mapped_read_count" > pver_mapped_read_counts.txt
+cat *pvercount.txt >> pver_mapped_read_counts.txt
+```
+ 
