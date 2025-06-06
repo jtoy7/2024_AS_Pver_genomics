@@ -1385,5 +1385,6 @@ sort -k3,3 coverage_summary.tsv | less
 | 2024_OFU3_Pver_27_1 |                                                  62.156  | 70           | 0.713505                  |
 | 2024_VATI_Pver_15_1 |                                                  65.637  | 74           | 0.710618                  |
 | 2024_ALOF_Pver_05_1 |                                                  76.069  | 87           | 0.716447                  |
+
 Most samples have at least **20x median** depth and **~70% coverage**.
 <br>
