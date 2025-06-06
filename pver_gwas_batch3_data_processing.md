@@ -1234,4 +1234,156 @@ sort -k4,4 pver_mapped_read_percents.txt | less
 | 2024_FTEL_Pspp_Extra4_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam |           84,261,370   |             171,551,884 | 0.491171           |
 | 2024_AOAA_Pver_17_1_PverCD_dedup_primary_minq20_mlen20_pver_reheadered.bam     |           51,694,440   |             105,192,387 | 0.491428           |
 
-Percent of mapped reads that concordantly map to Pver contigs ranges from 48-60%
+Percent of mapped reads that concordantly map to Pver contigs ranges from **48-60%**.
+
+<br>
+
+
+## Calculate depth/coverage statistics for host with `CollectWgsMetricsWithNonZeroCoverage`
+`CollectWgsMetrics_pver_only_nonzero_array.slurm`
+```bash
+#!/bin/bash
+#SBATCH --job-name CollectWgsMetrics_pver_only_nonzero_array_2025-06-05
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-380%110
+#SBATCH --ntasks=1
+#SBATCH --mem=110G
+#SBATCH --time 7-00:00:00
+
+
+## Load modules
+module load container_env gatk
+
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMLIST=$BASEDIR/pver_gwas/hologenome_mapped_all/sample_lists/pver_bams_list.txt
+GATK='crun.gatk gatk'
+REFERENCE=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
+
+
+## Loop over each sample
+# for SAMPLEBAM in `cat $BAMLIST`; do
+
+SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID},1p" $BAMLIST)
+echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
+echo Sample bam is $SAMPLEBAM
+
+
+## Run CollectWgsMetrics
+$GATK --java-options "-Xmx110G" CollectWgsMetricsWithNonZeroCoverage \
+  --INPUT $BASEDIR'/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/'$SAMPLEBAM \
+  --OUTPUT $BASEDIR'/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/'${SAMPLEBAM%.*}'_metrics_nonzero.txt' \
+  --CHART $BASEDIR'/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/'${SAMPLEBAM%.*}'_metrics_nonzero_chart.pdf' \
+  --REFERENCE_SEQUENCE $REFERENCE
+
+echo 'done-zo woot!'
+```
+
+<br>
+
+### Plot histograms of coverage depth and summarise coverage statistics using R script `summarize_coverage_stats.R`
+First extract histogram data from output files and save to new files:
+```bash
+for FILE in `ls *nonzero.txt`; do
+    tail -n +12 $FILE > ${FILE%.*}_histdata.tsv
+done
+```
+
+<br>
+
+I realized some files have "Extra" in their name which throws off the consistency of file name character lengths. So first rename these files, replacing "Extra" with "X" so that this part of the sample identifier becomes 2 characters in length.
+```bash
+# First do a dry run to make sure the command is working as expected:
+for FILE in *Extra*_PverCD_dedup_primary_minq20_mlen20_pver_reheadered*; do
+  newname=$(echo "$FILE" | sed 's/Extra/X/')
+  echo $newname
+done
+
+# Now actually change the names
+for FILE in *Extra*_PverCD_dedup_primary_minq20_mlen20_pver_reheadered*; do
+  newname=$(echo "$FILE" | sed 's/Extra/X/')
+  mv "$FILE" "$newname"
+done
+```
+
+Then run R script (I ran it in Rstudio Server to track it in real time):
+`summarize_coverage_stats.R`
+```r
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/merged_bams/dedup_bams/pver_bams/")
+
+file_list <- list.files(pattern = "histdata\\.tsv$")
+
+for (FILE in file_list) {
+  
+  # extract sample name
+  sample <- substr(FILE, 1, 19)
+  print(sample)
+  
+  # load data
+  histdat <- read_tsv(file = FILE, col_names = TRUE) %>% 
+    mutate(coverage_count = coverage * count_NON_ZERO_REGIONS)
+
+  # plot non-zero depth histogram
+  cov_plot <- ggplot(histdat) + 
+    geom_col(aes(x = coverage, y = count_NON_ZERO_REGIONS))
+
+  ggsave(cov_plot, filename = paste0(sample, "_coverage_hist.pdf"), device = "pdf")
+  
+  # calculate mean depth
+  mean_depth = sum(histdat$coverage_count)/sum(histdat$count_NON_ZERO_REGIONS)
+
+  # calculate median depth  
+  expanded_dataset <- rep(histdat$coverage, histdat$count_NON_ZERO_REGIONS)
+  median_depth <- median(expanded_dataset)
+
+  # calculate % of genome covered
+  pver_genome_size <- 353416094
+  coverage <- sum(histdat$count_NON_ZERO_REGIONS)/pver_genome_size
+
+  # write stats to file
+  header <- "Sample\tMean_Depth\tMedian_Depth\tProportion_Genome_Covered"
+  
+  if (!file.exists("coverage_summary.tsv") || file.info("coverage_summary.tsv")$size == 0) {
+    # If the file doesn't exist or is empty, write the header and the first line of data
+    write(header, file="coverage_summary.tsv")
+    write(paste(sample, mean_depth, median_depth, coverage, sep="\t"), file="coverage_summary.tsv", append=TRUE)
+  } else {
+    # If the file exists and is not empty, append the new line of data
+    write(paste(sample, mean_depth, median_depth, coverage, sep="\t"), file="coverage_summary.tsv", append=TRUE)
+  }
+}
+```
+
+Check per-sample coverage/depth:
+```bash
+sort -k3,3 coverage_summary.tsv | less
+```
+
+| Sample              | Mean_Depth                                               | Median_Depth                          | Proportion_Genome_Covered |
+|---------------------|----------------------------------------------------------|---------------------------------------|---------------------------|
+| 2024_OFU3_Pver_24_1 |                                                  13.806  |                                   14  | 0.670632                  |
+| 2024_OFU3_Pver_11_1 |                                                  14.312  |                                   15  | 0.672853                  |
+| 2024_OFU3_Pver_05_1 |                                                  15.489  |                                   16  | 0.675293                  |
+| 2024_OFU3_Pver_07_1 |                                                  16.627  |                                   17  | 0.678445                  |
+| 2024_OFU3_Pver_12_1 |                                                  18.469  |                                   19  | 0.682938                  |
+| 2024_OFU3_Pver_16_1 |                                                  18.712  |                                   19  | 0.68163                   |
+| 2024_OFU3_Pver_14_1 |                                                  20.102  |                                   21  | 0.683576                  |
+| 2024_ALOF_Pver_27_1 |                                                  22.375  |                                   23  | 0.68571                   |
+| 2024_FASA_Pver_34_2 |                                                  21.893  |                                   23  | 0.686843                  |
+| 2024_AOAA_Pver_02_1 |                                                  23.234  |                                   24  | 0.687666                  |
+|...                  |...                                                       |...           |...                        |
+| 2024_VATI_Pver_11_1 |                                                  53.026  | 59           | 0.710328                  |
+| 2024_FALU_Pver_33_1 |                                                  54.787  | 61           | 0.708923                  |
+| 2024_LEON_Pver_07_1 |                                                  57.505  | 64           | 0.711158                  |
+| 2024_AOAA_Pver_14_1 |                                                  57.742  | 65           | 0.711169                  |
+| 2024_FTEL_Pver_38_1 |                                                  59.097  | 67           | 0.744652                  |
+| 2024_VATI_Pver_08_1 |                                                  60.125  | 67           | 0.715447                  |
+| 2024_MALO_Pver_03_1 |                                                  60.232  | 68           | 0.704                     |
+| 2024_OFU3_Pver_27_1 |                                                  62.156  | 70           | 0.713505                  |
+| 2024_VATI_Pver_15_1 |                                                  65.637  | 74           | 0.710618                  |
+| 2024_ALOF_Pver_05_1 |                                                  76.069  | 87           | 0.716447                  |
+Most samples have at least **20x median** depth and **~70% coverage**.
+<br>
