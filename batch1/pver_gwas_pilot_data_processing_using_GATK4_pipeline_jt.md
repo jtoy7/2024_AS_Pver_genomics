@@ -912,7 +912,7 @@ This version of the script can be used to check to see if .bai index files alrea
 #SBATCH --ntasks=1
 #SBATCH --mem=100G
 #SBATCH --time 5-00:00:00
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=30
 
 ## Load modules
 module load container_env gatk
