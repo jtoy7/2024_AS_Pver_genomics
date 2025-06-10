@@ -1470,7 +1470,9 @@ $GATK --java-options "-Xmx25G" HaplotypeCaller \
 echo "done-zo woot!"
 ```
 The current max per-user CPU usage for Wahab is 512, so using 16 threads per job allows 32 jobs to run simultaneously. Each job seems to take anywhere from 11-20 hrs to complete with most around 13.
+
 <br>
+
 Checked CPU use efficiency using:
 ```bash
 sacct -j 4457047 --format=JobID,JobName%25,AllocCPUs,Elapsed,TotalCPU,CPUTimeRAW,MaxRSS,State
