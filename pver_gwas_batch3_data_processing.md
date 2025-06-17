@@ -1533,3 +1533,50 @@ $GATK --java-options "-Xmx300g -Xms10g" \
    -L /cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list \
 ```
 
+## Joint genotyping with GenotypeGVCFs
+This step is parallelized by genomic region to speed up processing time, since GenotypeGVCFs doesn't have internal parallelization options.
+
+<br>
+
+`GenotypeGVCFs_array.slurm`
+```bash
+#!/bin/bash
+
+#SBATCH --job-name GenotypeGVCFs_pver_2025-06-17
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-52%52
+#SBATCH --ntasks=1
+#SBATCH --mem=120G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=10
+
+## Load modules
+module load container_env gatk
+
+BASEDIR=/archive/barshis/barshislab/jtoy/
+REFERENCE=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
+OUTDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/vcf
+GENDB=$BASEDIR/pver_gwas/hologenome_mapped_all/genomicsdb
+SCAFLIST=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list
+GATK='crun.gatk gatk'
+
+
+# Create output directory if it doesn't already exist
+mkdir -p $OUTDIR
+
+
+SCAF=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $SCAFLIST)
+
+
+echo "Processing scaffold: $SCAF"
+
+$GATK --java-options "-Xmx100g" GenotypeGVCFs \
+  -R $REFERENCE \
+  -V gendb://$GENDB \
+  -L $SCAF \
+  -O $OUTDIR/$SCAF_'genotypes.vcf.gz' \
+```
