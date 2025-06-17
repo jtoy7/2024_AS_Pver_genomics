@@ -1469,7 +1469,7 @@ $GATK --java-options "-Xmx25G" HaplotypeCaller \
 
 echo "done-zo woot!"
 ```
-The current max per-user CPU usage for Wahab is 512, so using 16 threads per job allows 32 jobs to run simultaneously. Each job seems to take anywhere from 11-20 hrs to complete with most around 13.
+The current max per-user CPU usage for Wahab is 512, so using 16 threads per job allows 32 jobs to run simultaneously. Each job seems to take anywhere from 11-20 hrs to complete with most around 13. Total run time for the array job was 7 days.
 
 <br>
 
@@ -1479,4 +1479,57 @@ sacct -j 4457047 --format=JobID,JobName%25,AllocCPUs,Elapsed,TotalCPU,CPUTimeRAW
 ```
 Calculated efficency as: TotalCPU / (AllocCPUS * Elapsed). Efficiency for jobs was around 50-60%.
 
+<br>
+
+## Consolidate per sample GVCFs with GenomicsDBImport
+First need to create a tab-delimited map file with sample_name in the first column and /path/to/vcf in the second column:
+```bash
+BASEDIR=/archive/barshis/barshislab/jtoy/
+GVCFDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/gvcfs/
+
+cd $GVCFDIR
+
+OUTPUT="pver_gwas_all_gvcf.sample_map"
+> $OUTPUT
+
+# Loop through matching files
+for FILE in `ls *_reheadered.g.vcf.gz`; do
+  # Extract first 5 underscore-separated fields
+  PREFIX=$(echo "$FILE" | cut -d '_' -f1-5)
+  
+  # Append to the output file
+  echo -e "$PREFIX\t$GVCFDIR$FILE" >> $OUTPUT
+done
+```
+
+
+### Run GenomicsDBImport SLURM script
+`GenomicsDBImport.slurm`:
+```bash
+#!/bin/bash
+
+#SBATCH --job-name GenomicsDBImport_pver_2025-06-17
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --ntasks=1
+#SBATCH --mem=340G
+#SBATCH --time 7-00:00:00
+#SBATCH --cpus-per-task=38
+
+## Load modules
+module load container_env gatk
+
+BASEDIR=/archive/barshis/barshislab/jtoy/
+GATK='crun.gatk gatk'
+
+## Run GenomicsDBImport
+$GATK --java-options "-Xmx300g -Xms10g" \
+   GenomicsDBImport \
+   --genomicsdb-workspace-path $BASEDIR/pver_gwas/hologenome_mapped_all/genomicsdb/ \  # Note: do not create this directory ahead of time. GATK will create it automatically
+   --sample-name-map $BASEDIR/pver_gwas/hologenome_mapped_all/gvcfs/pver_gwas_all_gvcf.sample_map \
+   -L /cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list \
+```
 
