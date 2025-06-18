@@ -1584,7 +1584,7 @@ $GATK --java-options "-Xmx90g -Xms10g" \
 
 
 ## Joint genotyping with GenotypeGVCFs
-This step is parallelized by genomic region to speed up processing time, since GenotypeGVCFs doesn't have internal parallelization options.
+This step is also parallelized by genomic region to speed up processing time, since GenotypeGVCFs doesn't have internal parallelization options.
 
 <br>
 
@@ -1592,41 +1592,43 @@ This step is parallelized by genomic region to speed up processing time, since G
 ```bash
 #!/bin/bash
 
-#SBATCH --job-name GenotypeGVCFs_pver_2025-06-17
+#SBATCH --job-name=GenotypeGVCFs_pver_2025-06-18
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
-#SBATCH --array=1-52%52
+#SBATCH --array=1-52%51
 #SBATCH --ntasks=1
-#SBATCH --mem=120G
-#SBATCH --time 5-00:00:00
+#SBATCH --mem=100G
+#SBATCH --time=5-00:00:00
 #SBATCH --cpus-per-task=10
 
-## Load modules
+# Load GATK module
 module load container_env gatk
 
-BASEDIR=/archive/barshis/barshislab/jtoy/
+# Define paths
+BASEDIR=/archive/barshis/barshislab/jtoy
 REFERENCE=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/GCF_036669915.1_ASM3666991v2_genom_suffixed.fasta
 OUTDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/vcf
-GENDB=$BASEDIR/pver_gwas/hologenome_mapped_all/genomicsdb
+GENDBBASE=$BASEDIR/pver_gwas/hologenome_mapped_all/genomicsdb
 SCAFLIST=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list
 GATK='crun.gatk gatk'
 
-
-# Create output directory if it doesn't already exist
+# Create output directory if it doesn't exist
 mkdir -p $OUTDIR
 
+# Get the current region and scaffold
+REGION_ID=${SLURM_ARRAY_TASK_ID}
+GENDB=${GENDBBASE}/region_${REGION_ID}
+SCAF=$(sed -n "${REGION_ID}p" $SCAFLIST)
 
-SCAF=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $SCAFLIST)
+echo "Processing region: region_${REGION_ID}, corresponding to scaffold: $SCAF"
+echo "Using GenomicsDB workspace: $GENDB"
 
-
-echo "Processing scaffold: $SCAF"
-
-$GATK --java-options "-Xmx100g" GenotypeGVCFs \
+# Run GenotypeGVCFs
+$GATK --java-options "-Xmx95g" GenotypeGVCFs \
   -R $REFERENCE \
   -V gendb://$GENDB \
-  -L $SCAF \
-  -O $OUTDIR/$SCAF_'genotypes.vcf.gz' \
+  -O $OUTDIR/${SCAF}_genotypes.vcf.gz
 ```
