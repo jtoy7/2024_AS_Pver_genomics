@@ -1582,11 +1582,10 @@ $GATK --java-options "-Xmx90g -Xms10g" \
    --reader-threads 10
 ```
 
+<br>
 
 ## Joint genotyping with GenotypeGVCFs
 This step is also parallelized by genomic region to speed up processing time, since GenotypeGVCFs doesn't have internal parallelization options.
-
-<br>
 
 `GenotypeGVCFs_array.slurm`
 ```bash
