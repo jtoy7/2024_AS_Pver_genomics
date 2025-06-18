@@ -1489,11 +1489,11 @@ GVCFDIR=$BASEDIR/pver_gwas/hologenome_mapped_all/gvcfs/
 
 cd $GVCFDIR
 
-OUTPUT="pver_gwas_all_gvcf.sample_map"
+OUTPUT="pver_gwas_batch23_gvcf.sample_map"
 > $OUTPUT
 
 # Loop through matching files
-for FILE in `ls *_reheadered.g.vcf.gz`; do
+for FILE in `ls $GVCFDIR*_reheadered.g.vcf.gz`; do
   # Extract first 5 underscore-separated fields
   PREFIX=$(echo "$FILE" | cut -d '_' -f1-5)
   
@@ -1501,6 +1501,12 @@ for FILE in `ls *_reheadered.g.vcf.gz`; do
   echo -e "$PREFIX\t$GVCFDIR$FILE" >> $OUTPUT
 done
 ```
+
+Then combine this map file with the map file for the pilot samples:
+```bash
+cat pver_gwas_batch23_gvcf.sample_map /cm/shared/courses/dbarshis/barshislab/jtoy/pver_gwas_pilot/gvcfs/pver_gwas_pilot_gvcf.sample_map | sort -k1,1 > pver_gwas_all_gvcf.sample_map
+```
+This map file should now have 396 entries.
 
 
 ### Run GenomicsDBImport SLURM script
@@ -1532,6 +1538,50 @@ $GATK --java-options "-Xmx300g -Xms10g" \
    --sample-name-map $BASEDIR/pver_gwas/hologenome_mapped_all/gvcfs/pver_gwas_all_gvcf.sample_map \
    -L /cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list \
 ```
+This was too slow, so I canceled it and rescripted it as an array job, splitting by genomic region (contig).
+
+`GenomicsDBImport_array.slurm`
+```bash
+#!/bin/bash
+
+#SBATCH --job-name GenomicsDBImport_array_pver_2025-06-18
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 7-00:00:00
+#SBATCH --cpus-per-task=10
+#SBATCH --array=1-52%51
+
+## Load modules
+module load container_env gatk
+GATK='crun.gatk gatk'
+
+
+## Assign variables
+BASEDIR=/archive/barshis/barshislab/jtoy/
+REGION_LIST=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_0366699>
+
+## Create genomicsdb directory if it doesn't already exist
+mkdir -p $BASEDIR/pver_gwas/hologenome_mapped_all/genomicsdb
+
+
+## Initiate array
+REGION=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $REGION_LIST)
+
+
+## Run GenomicsDBImport
+$GATK --java-options "-Xmx90g -Xms10g" \
+   GenomicsDBImport \
+   --genomicsdb-workspace-path $BASEDIR/pver_gwas/hologenome_mapped_all/genomicsdb/region_${SLURM_ARRAY_TASK_ID} \
+   --sample-name-map $BASEDIR/pver_gwas/hologenome_mapped_all/gvcfs/pver_gwas_all_gvcf.sample_map \
+   -L $REGION \
+   --reader-threads 10
+```
+
 
 ## Joint genotyping with GenotypeGVCFs
 This step is parallelized by genomic region to speed up processing time, since GenotypeGVCFs doesn't have internal parallelization options.
