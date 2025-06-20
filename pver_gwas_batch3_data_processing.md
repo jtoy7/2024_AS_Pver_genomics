@@ -1581,6 +1581,7 @@ $GATK --java-options "-Xmx90g -Xms10g" \
    -L $REGION \
    --reader-threads 10
 ```
+The first chromosome took the longest to import - a little over 24 hrs.
 
 <br>
 
@@ -1591,7 +1592,7 @@ This step is also parallelized by genomic region to speed up processing time, si
 ```bash
 #!/bin/bash
 
-#SBATCH --job-name=GenotypeGVCFs_pver_2025-06-18
+#SBATCH --job-name=GenotypeGVCFs_pver_2025-06-19
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
