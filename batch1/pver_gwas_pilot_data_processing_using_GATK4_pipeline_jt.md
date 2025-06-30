@@ -1040,7 +1040,7 @@ $GATK --java-options "-Xmx100g" GenotypeGVCFs \
    -O $OUTDIR/$SCAF_'genotypes.vcf.gz' \
 ```
 
-Once genotyping is complete, there will we a separate vcf for each sample. Combine them into a single multi-sample VCF with BCFtools:
+Once genotyping is complete, there will we a separate vcf for each genomic region (scaffold/contig). Combine them into a single multi-sample VCF with BCFtools:
 ```bash
 # make list of vcf files
 ls *.vcf.gz | sort > vcf_list.txt
