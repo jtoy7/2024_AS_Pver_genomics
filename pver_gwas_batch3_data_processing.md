@@ -1632,3 +1632,107 @@ $GATK --java-options "-Xmx95g" GenotypeGVCFs \
   -V gendb://$GENDB \
   -O $OUTDIR/${SCAF}_genotypes.vcf.gz
 ```
+
+Once genotyping is complete, there will we a separate vcf for each genomic region (scaffold/contig). Combine them into a single multi-sample VCF with BCFtools:
+```bash
+# make list of vcf files
+ls *.vcf.gz | sort > vcf_list.txt
+
+
+# combine VCFs
+crun.bcftools bcftools concat -f vcf_list.txt --threads 34 -Ov -o pver_all_combined_genotypes.vcf
+```
+
+Now count the total number of called genotypes (variants):
+```bash
+grep -v "#" pver_all_combined_genotypes.vcf | wc -l
+```
+**32,498,469** total SNPs
+
+<br>
+
+## 12. Variant filtering
+
+First we need to know a bit about the depth of coverage at each variant
+```bash
+# Get the total site depth per position, i.e., the sum of read depths from all samples at each variant site, using the INFO/DP field.
+crun.bcftools bcftools query -f '%CHROM\t%POS\t%INFO/DP\n' pver_all_combined_genotypes.vcf > pver_all_combined_genotypes.total_site_depth                # run on full vcf
+```
+```
+NC_089312.1_Pverrucosa  3708    66
+NC_089312.1_Pverrucosa  3822    6
+NC_089312.1_Pverrucosa  5798    23
+NC_089312.1_Pverrucosa  5823    8
+NC_089312.1_Pverrucosa  6389    2
+NC_089312.1_Pverrucosa  7705    150
+NC_089312.1_Pverrucosa  7712    155
+NC_089312.1_Pverrucosa  7719    129
+NC_089312.1_Pverrucosa  10033   6
+NC_089312.1_Pverrucosa  10799   9
+...
+```
+
+```bash
+# Get the per sample depth at each position
+crun.bcftools bcftools query -f '%CHROM\t%POS[\t%DP]\n' pver_all_combined_genotypes.vcf > pver_all_combined_genotypes.per_sample_depth                # run on full vcf
+```
+```
+NC_089312.1_Pverrucosa  3708    0       0       0       0       0       0       0       0       0       2       0       0       0   
+NC_089312.1_Pverrucosa  3822    0       0       0       0       0       0       0       0       0       0       0       0       0   
+NC_089312.1_Pverrucosa  5798    0       0       0       0       0       0       0       1       0       0       0       0       0   
+NC_089312.1_Pverrucosa  5823    0       0       0       0       0       0       0       1       0       0       0       0       0   
+NC_089312.1_Pverrucosa  6389    0       0       0       0       0       0       0       0       0       0       0       0       0   
+NC_089312.1_Pverrucosa  7705    2       0       0       0       0       0       0       0       0       0       2       0       0   
+NC_089312.1_Pverrucosa  7712    2       0       0       0       0       0       0       0       0       0       2       0       0   
+NC_089312.1_Pverrucosa  7719    2       0       0       0       0       0       0       0       0       0       3       0       0   
+NC_089312.1_Pverrucosa  10033   0       0       0       0       0       0       0       0       0       0       0       0       0   
+NC_089312.1_Pverrucosa  10799   0       1       0       0       0       0       0       0       0       0       0       0       0
+...
+```
+
+```
+# Get a set of summary stats for the vcf (distributions of quality scores, depths, etc)
+crun.bcftools bcftools stats pver_all_combined_genotypes.vcf > pver_all_combined_genotypes.stats                # run on full vcf
+```
+
+<br>
+
+Plot depth per site in R:
+```r
+# SNP depth of coverage analysis - Pver Pilot
+# 2025-04-25
+# Jason A. Toy
+
+library(tidyverse)
+
+rm(list = ls())
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf")
+
+
+# load total depth file
+td <- read_tsv("pver_all_combined_genotypes.total_site_depth", col_names = FALSE)
+
+# calculate summary stats
+mean_td <- mean(td$X3)
+median_td <- median(td$X3)
+sd_td <- sd(td$X3)
+
+
+# plot distribution
+p <- ggplot(td) +
+  geom_freqpoly(aes(x = X3), binwidth = 1) + 
+  xlab("SNP depth") +
+  xlim(c(0,5000)) +
+  ylab("Count") +
+  geom_vline(xintercept = mean_td, color = "blue") +
+  geom_vline(xintercept = median_td, color = "darkgreen") +
+  geom_vline(xintercept = median_td + sd_td, color = "black", linetype = "dashed") +
+  annotate("text", x=3000, y=30000, label=paste0(round(length(td$X3)/10^6,2), " million SNPs before filtering"), color = 'red') +
+  annotate("text", x=3000, y=28000, label=paste0("mean total depth = ", round(mean_td, 1)), color = "blue") +
+  annotate("text", x=3000, y=26000, label=paste0("median total depth = ", median_td), color = "darkgreen") +
+  annotate("text", x=3000, y=24000, label=paste0("--- ", "median total depth + 1 SD = ", round(median_td + sd_td, 1)), color = "black") +
+  theme_bw()
+
+ggsave(p, "snp_depth_plot.png", width = "12", height = "8", units = "in")
+```
+![](snp_depth_plot.png)
