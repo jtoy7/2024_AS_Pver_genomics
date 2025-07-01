@@ -427,8 +427,69 @@ echo -e "$SAMPLEBAM\t$COUNT" >> postdedup_read_counts.txt
 
 echo "done-zo woot!"
 ```
+This actually counts all reads, not just mapped reads so I reran it as the version below:
+```bash
+#!/bin/bash
+#SBATCH --job-name count_postdedup_mapped_reads_array_2025-06-30
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-16%16
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=16
 
- 
+
+## Load modules
+module load container_env samtools
+
+BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
+BAMLIST=$BASEDIR/pver_gwas_pilot/sample_lists/dedup_bams_coordsorted_list.txt
+
+## Change working directory
+cd $BASEDIR/pver_gwas_pilot/bam/dedup_bams2
+
+## Loop over each sample
+# for SAMPLEBAM in `cat $BAMLIST`; do
+
+SAMPLEBAM=$(sed -n "${SLURM_ARRAY_TASK_ID},1p" $BAMLIST)
+echo Slurm array task ID is: $SLURM_ARRAY_TASK_ID
+echo Sample bam is $SAMPLEBAM
+
+
+COUNT=`crun.samtools samtools view -@16 -F 4 $SAMPLEBAM | wc -l`
+
+echo -e "$SAMPLEBAM\t$COUNT" >> postdedup_mapped_read_counts.txt
+
+
+echo "done-zo woot!"
+```
+Sort counts file:
+```bash
+sort -k1,1 postdedup_mapped_read_counts.txt > postdedup_mapped_read_counts_sorted.txt
+```
+
+```
+2024_VATI_Pver_21_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      336872789
+2024_VATI_Pver_22_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      328158377
+2024_VATI_Pver_23_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      292872027
+2024_VATI_Pver_24_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      271939942
+2024_VATI_Pver_25_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      229791777
+2024_VATI_Pver_26_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      216203805
+2024_VATI_Pver_27_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      222965633
+2024_VATI_Pver_28_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      235054474
+2024_VATI_Pver_29_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      272361527
+2024_VATI_Pver_30_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      195771705
+2024_VATI_Pver_31_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      252517657
+2024_VATI_Pver_32_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      299038006
+2024_VATI_Pver_33_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      144087190
+2024_VATI_Pver_34_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      268303671
+2024_VATI_Pver_35_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      137841677
+2024_VATI_Pver_36_1_227H3WLT4-L008_bt2_combined_pver_cd_hologenome_sorted_reheadered_qsorted_dedup_coordsorted.bam      141689136
+```
 
 ## 5. Calculate depth/coverage statistics with CollectWgsMetrics:
 
@@ -596,7 +657,7 @@ echo "done-zo woot!"
 ```
 
 ### Calculate percent host reads
-
+Percent of total reads:
 ```bash
 BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
 
@@ -635,6 +696,45 @@ awk '{print $0, $2/$3}' \
 | 2024_VATI_Pver_35_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 69922392                                        | 160741570                        | 0.434999           |
 | 2024_VATI_Pver_36_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 72196466                                        | 165617090                        | 0.435924           |
 
+<br>
+
+Percent of total **mapped** reads:
+```bash
+BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
+
+# first sort counts files
+sort -k1,1 $BASEDIR/pver_gwas_pilot/bam/dedup_bams2/postdedup_mapped_read_counts.txt >  $BASEDIR/pver_gwas_pilot/bam/dedup_bams2/postdedup_mapped_read_counts_sorted.txt
+sort -k1,1 $BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/pver_read_counts.txt > $BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/pver_read_counts_sorted.txt
+
+# paste columns together
+paste <(cut -f1 "$BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/pver_read_counts_sorted.txt") \
+      <(cut -f2 "$BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/pver_read_counts_sorted.txt") \
+      <(cut -f2 "$BASEDIR/pver_gwas_pilot/bam/dedup_bams2/postdedup_mapped_read_counts_sorted.txt") \
+      > "$BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/pver_and_total_mapped_read_counts.txt"
+
+# calculate percentages
+awk '{print $0, $2/$3}' \
+    "$BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/pver_and_total_mapped_read_counts.txt" \
+    > "$BASEDIR/pver_gwas_pilot/bam/dedup_bams2/pver_bams/pver_mapped_read_percents.txt"
+```
+| Sample                                                                                       | Post-processing_Pver_read_count_condordant_only | Post-processing_total_mapped_read_count | Percent_Pver_reads |
+|----------------------------------------------------------------------------------------------|-------------------------------------------------|-----------------------------------------|--------------------|
+| 2024_VATI_Pver_21_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 176042818                                       | 336872789                               | 0.52258            |
+| 2024_VATI_Pver_22_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 168635188                                       | 328158377                               | 0.513884           |
+| 2024_VATI_Pver_23_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 151224676                                       | 292872027                               | 0.516351           |
+| 2024_VATI_Pver_24_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 137435262                                       | 271939942                               | 0.505388           |
+| 2024_VATI_Pver_25_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 116004972                                       | 229791777                               | 0.504826           |
+| 2024_VATI_Pver_26_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 110263344                                       | 216203805                               | 0.509997           |
+| 2024_VATI_Pver_27_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 112565296                                       | 222965633                               | 0.504855           |
+| 2024_VATI_Pver_28_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 116284158                                       | 235054474                               | 0.494712           |
+| 2024_VATI_Pver_29_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 138842314                                       | 272361527                               | 0.509772           |
+| 2024_VATI_Pver_30_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 99908544                                        | 195771705                               | 0.510332           |
+| 2024_VATI_Pver_31_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 127183126                                       | 252517657                               | 0.50366            |
+| 2024_VATI_Pver_32_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 149764782                                       | 299038006                               | 0.500822           |
+| 2024_VATI_Pver_33_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 73224156                                        | 144087190                               | 0.508193           |
+| 2024_VATI_Pver_34_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 134343792                                       | 268303671                               | 0.500715           |
+| 2024_VATI_Pver_35_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 69922392                                        | 137841677                               | 0.507266           |
+| 2024_VATI_Pver_36_1_227H3WLT4-L008_bt2_PverCDdedup_primary_minq20_mlen20_pver_reheadered.bam | 72196466                                        | 141689136                               | 0.509541           |
 
 
 ## 7. Calculate depth/coverage statistics for host with CollectWgsMetricsWithNonZeroCoverage:
