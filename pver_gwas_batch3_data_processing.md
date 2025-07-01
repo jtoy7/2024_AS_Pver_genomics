@@ -1699,7 +1699,7 @@ crun.bcftools bcftools stats pver_all_combined_genotypes.vcf > pver_all_combined
 
 Plot depth per site in R:
 ```r
-# SNP depth of coverage analysis - Pver Pilot
+# SNP depth of coverage analysis - Pver All Samples
 # 2025-04-25
 # Jason A. Toy
 
@@ -1735,4 +1735,33 @@ p <- ggplot(td) +
 
 ggsave(p, "snp_depth_plot.png", width = "12", height = "8", units = "in")
 ```
-![](snp_depth_plot.png)
+![image](https://github.com/user-attachments/assets/45b1c578-305e-4af1-8440-399d1d9023e6)
+
+<br>
+
+### Filter variants with with PLINK2
+First filter on quality scores (mapping & variant) and depth with BCFtools:
+```bash
+crun.bcftools bcftools filter --threads 36 -e 'QUAL < 30 || INFO/MQ < 40 || INFO/DP < 792 || INFO/DP > 25286' pver_all_combined_genotypes.vcf -Oz -o pver_all_QDPfiltered_genotypes.vcf.gz
+
+# Base quality score filter set to 30. Mapping quality score filter set to 40
+# There are 396 total samples now. Per sampl depth filter was set to 2 * 396 = 792. Total depth filter was set to median total depth + 1 SD = 25,286.
+```
+This leaves **1,603,744** SNPs
+
+<br>
+
+Next filter based on missingess and MAF and remove indels and multiallelic SNPs:
+```bash
+module load plink/2024.03.02    # Note: this is PLINK2
+
+crun.plink plink2 \
+  --vcf pver_all_QDPfiltered_genotypes.vcf.gz \
+  --snps-only just-acgt \
+  --max-alleles 2 \
+  --geno 0.2 \    # removes SNPs where more than 20% of individuals have missing genotypes
+  --mind 0.2 \    # removes individuals who are missing more than 20% of genotype data across all SNPs
+  --maf 0.05 \    # removes SNPs where the minor allele frequency is less than 0.05
+  --make-pgen \
+  --out pver_all_MISSMAFfiltered_genotypes
+```
