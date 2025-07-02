@@ -1798,5 +1798,27 @@ This leaves **1,134,549** SNPs remaining after filtering.
 
 
 ## LD-pruning with PLINK2
+PLINK2 requires unique values in the ID field for each SNP. Our dataset does not contain any ID values, but instead has "." placeholders. So the first thing we need to do is replace these with a chromosome/position-based ID:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_MISSMAFfiltered_genotypes.pgen \
+  --psam pver_all_MISSMAFfiltered_genotypes.psam \
+  --pvar pver_all_MISSMAFfiltered_genotypes.pvar \
+  --set-all-var-ids @:#:\$r:\$a \
+  --make-pgen \
+  --out pver_all_MISSMAFfiltered_uniqIDs
+```
+The `@:#:$r:$a` syntax creates IDs formatted as `CHROM:POS:REF:ALT`.
 
+<br>
 
+Now run LD estimation. Output is an LD-pruned list of SNPs:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_MISSMAFfiltered_uniqIDs.pgen \
+  --psam pver_all_MISSMAFfiltered_uniqIDs.psam \
+  --pvar pver_all_MISSMAFfiltered_uniqIDs.pvar \
+  --indep-pairwise 50 10 0.2 \
+  --out pver_all_MISSMAFfiltered_ld
+ # --bad-ld
+```
