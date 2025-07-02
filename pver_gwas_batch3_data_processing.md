@@ -1747,7 +1747,12 @@ crun.bcftools bcftools filter --threads 36 -e 'QUAL < 30 || INFO/MQ < 40 || INFO
 # Base quality score filter set to 30. Mapping quality score filter set to 40
 # There are 396 total samples now. Per sampl depth filter was set to 2 * 396 = 792. Total depth filter was set to median total depth + 1 SD = 25,286.
 ```
-This leaves **1,603,744** SNPs
+
+Count remaining SNPs:
+```bash
+zcat pver_all_QDPfiltered_genotypes.vcf.gz | grep -v "#" | wc -l
+```
+This leaves **5,255,644** SNPs
 
 <br>
 
@@ -1759,9 +1764,25 @@ crun.plink plink2 \
   --vcf pver_all_QDPfiltered_genotypes.vcf.gz \
   --snps-only just-acgt \
   --max-alleles 2 \
-  --geno 0.2 \    # removes SNPs where more than 20% of individuals have missing genotypes
-  --mind 0.2 \    # removes individuals who are missing more than 20% of genotype data across all SNPs
-  --maf 0.05 \    # removes SNPs where the minor allele frequency is less than 0.05
+  --geno 0.2 \
+  --mind 0.2 \
+  --maf 0.05 \
   --make-pgen \
+  --out pver_all_MISSMAFfiltered_genotypes
+
+
+  # geno 0.2    removes SNPs where more than 20% of individuals have missing genotypes
+  # mind 0.2    removes individuals who are missing more than 20% of genotype data across all SNPs
+  # maf 0.05    removes SNPs where the minor allele frequency is less than 0.05
+  # threads N    multithreading option available
+```
+
+Convert to VCF for viewing:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_MISSMAFfiltered_genotypes.pgen \
+  --psam pver_all_MISSMAFfiltered_genotypes.psam \
+  --pvar pver_all_MISSMAFfiltered_genotypes.pvar \
+  --recode vcf \
   --out pver_all_MISSMAFfiltered_genotypes
 ```
