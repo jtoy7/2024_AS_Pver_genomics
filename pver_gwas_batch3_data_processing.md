@@ -1812,13 +1812,137 @@ The `@:#:$r:$a` syntax creates IDs formatted as `CHROM:POS:REF:ALT`.
 
 <br>
 
-Now run LD estimation. Output is an LD-pruned list of SNPs:
+### Investigate rate of LD decay
+Compute pairwise-LD (r2) values:
+```
+crun.plink plink2 \
+  --pfile pver_all_MISSMAFfiltered_uniqIDs \
+  --thin-count 100000 \
+  --r2-unphased \
+  --ld-window-kb 1000 \
+  --ld-window-r2 0 \
+  --threads 30 \
+  --out ld_decay
+```
+
+Plot LD decay in R:
+`plot_ld_decay.R`
+```r
+# Plot LD decay - Pver all samples
+# 2025-07-02
+# Jason A. Toy
+
+library(tidyverse)
+
+rm(list = ls())
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf")
+
+
+# Import LD values
+library(data.table) # for faster import of large datasets
+ld <- fread("ld_decay.vcor") %>% mutate(DIST_BP = abs(POS_B - POS_A))
+
+
+# Bin distances and summarize r2 by bin
+bin_size <- 1000  # define distance bins in bp
+
+ld_summary <- ld %>%
+  mutate(DIST_BIN = floor(DIST_BP / bin_size) * bin_size) %>%
+  group_by(DIST_BIN) %>%
+  summarise(mean_r2 = mean(UNPHASED_R2, na.rm = TRUE), .groups = "drop")
+
+
+# Plot LD decay
+ldplot <- ggplot(ld_summary, aes(x = DIST_BIN/1000, y = mean_r2)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(size = 0.5, alpha = 0.6) +
+  labs(x = "Distance between SNPs (kb)", y = expression(paste("Mean ", r^2)),
+       title = "LD Decay Curve - Pver") +
+  theme_minimal(base_size = 14)
+
+ggsave(ldplot, file = "ld_decay_plot.pdf")
+```
+![image](https://github.com/user-attachments/assets/75bbc400-7b23-4e7b-b3fc-3fff19f10c57)
+The plot shows that **LD declines well below 0.2 by 10 kb**, so I will use that as my window size for pruning.
+
+<br>
+
+### Run LD pruning
+Output is an LD-pruned list of SNPs. I ran this twice with different r2 values for comparison:
+
+Stringent pruning for PCA, ADMIXTURE, etc (pruning SNP pairs with r2 > 0.2):
 ```bash
 crun.plink plink2 \
   --pgen pver_all_MISSMAFfiltered_uniqIDs.pgen \
   --psam pver_all_MISSMAFfiltered_uniqIDs.psam \
   --pvar pver_all_MISSMAFfiltered_uniqIDs.pvar \
-  --indep-pairwise 50 10 0.2 \
-  --out pver_all_MISSMAFfiltered_ld
- # --bad-ld
+  --indep-pairwise 10kb 1 0.2 \
+  --out pver_all_MISSMAFfiltered_ld_0.2
+```
+**80,208** SNPs retained.
+
+Lenient pruning (pruning SNP pairs with r2 > 0.5; balancing redundancy minimization with signal retention):
+```bash
+crun.plink plink2 \
+  --pgen pver_all_MISSMAFfiltered_uniqIDs.pgen \
+  --psam pver_all_MISSMAFfiltered_uniqIDs.psam \
+  --pvar pver_all_MISSMAFfiltered_uniqIDs.pvar \
+  --indep-pairwise 10kb 1 0.5 \
+  --out pver_all_MISSMAFfiltered_ld_0.5
+```
+**189,630** SNPs retained
+
+`indep-pairwise` parameters used:
+- `10kb` → window size in kb (can also be specified in number of SNPs by omitting "kb" suffix)
+- `1` → step size (how many SNPs to shift the window each time; must be 1 bp when specifying window size in kb)
+- `0.2` → r² threshold (SNPs with pairwise r² > 0.2 are considered linked)
+
+I used r2 > 0.2 to conservatively remove linked SNPs for population structure analysis, but the more lenient SNP set (r2 > 0.5) may be useful for other downstream analyses.
+
+### Filter dataset using pruned SNP list (stringent)
+```bash
+crun.plink plink2 \
+  --pgen pver_all_MISSMAFfiltered_uniqIDs.pgen \
+  --pvar pver_all_MISSMAFfiltered_uniqIDs.pvar \
+  --psam pver_all_MISSMAFfiltered_uniqIDs.psam \
+  --extract pver_all_MISSMAFfiltered_ld_0.2.prune.in \
+  --make-pgen \
+  --out pver_all_ld_pruned_0.2_genotypes
+```
+
+Convert to VCF for viewing/downstream use:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_ld_pruned_0.2_genotypes.pgen \
+  --psam pver_all_ld_pruned_0.2_genotypes.psam \
+  --pvar pver_all_ld_pruned_0.2_genotypes.pvar \
+  --recode vcf \
+  --out pver_all_ld_pruned_0.2_genotypes
+```
+
+Double-check number of SNPs in VCF:
+```bash
+grep -v "^#" pver_all_ld_pruned_0.2_genotypes.vcf | wc -l
+```
+```
+80208
+```
+
+
+## Principle components analysis
+
+Use PLINK2 to run a PCA:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_ld_pruned_0.2_genotypes.pgen \
+  --psam pver_all_ld_pruned_0.2_genotypes.psam \
+  --pvar pver_all_ld_pruned_0.2_genotypes.pvar \
+  --pca 10 \
+  --out pver_all_ld_pruned_0.2_pca
+```
+`--pca 10` calculates the first 10 principal components using exact PCA. For fast approximate PCA (very efficient, but less accurate), use pca approx 10.
+
+Plot PCA in R:
+```r
+
 ```
