@@ -1776,6 +1776,14 @@ crun.plink plink2 \
   # maf 0.05    removes SNPs where the minor allele frequency is less than 0.05
   # threads N    multithreading option available
 ```
+```
+...
+0 samples removed due to missing genotype data (--mind).
+396 samples (0 females, 0 males, 396 ambiguous; 396 founders) remaining aftermain filters.
+Calculating allele frequencies... done.
+--geno: 8 variants removed due to missing genotype data.
+3451112 variants removed due to allele frequency threshold(s)
+```
 
 Convert to VCF for viewing:
 ```bash
@@ -1786,3 +1794,9 @@ crun.plink plink2 \
   --recode vcf \
   --out pver_all_MISSMAFfiltered_genotypes
 ```
+This leaves **1,134,549** SNPs remaining after filtering.
+
+
+## LD-pruning with PLINK2
+
+
