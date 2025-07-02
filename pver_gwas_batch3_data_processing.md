@@ -1700,7 +1700,7 @@ crun.bcftools bcftools stats pver_all_combined_genotypes.vcf > pver_all_combined
 Plot depth per site in R:
 ```r
 # SNP depth of coverage analysis - Pver All Samples
-# 2025-04-25
+# 2025-07-01
 # Jason A. Toy
 
 library(tidyverse)
@@ -1722,20 +1722,20 @@ sd_td <- sd(td$X3)
 p <- ggplot(td) +
   geom_freqpoly(aes(x = X3), binwidth = 1) + 
   xlab("SNP depth") +
-  xlim(c(0,5000)) +
+  xlim(c(0,60000)) +
   ylab("Count") +
   geom_vline(xintercept = mean_td, color = "blue") +
   geom_vline(xintercept = median_td, color = "darkgreen") +
   geom_vline(xintercept = median_td + sd_td, color = "black", linetype = "dashed") +
-  annotate("text", x=3000, y=30000, label=paste0(round(length(td$X3)/10^6,2), " million SNPs before filtering"), color = 'red') +
-  annotate("text", x=3000, y=28000, label=paste0("mean total depth = ", round(mean_td, 1)), color = "blue") +
-  annotate("text", x=3000, y=26000, label=paste0("median total depth = ", median_td), color = "darkgreen") +
-  annotate("text", x=3000, y=24000, label=paste0("--- ", "median total depth + 1 SD = ", round(median_td + sd_td, 1)), color = "black") +
+  annotate("text", x=40000, y=12000, label=paste0(round(length(td$X3)/10^6,2), " million SNPs before filtering"), color = 'red') +
+  annotate("text", x=40000, y=11500, label=paste0("mean total depth = ", round(mean_td, 1)), color = "blue") +
+  annotate("text", x=40000, y=11000, label=paste0("median total depth = ", median_td), color = "darkgreen") +
+  annotate("text", x=40000, y=10500, label=paste0("--- ", "median total depth + 1 SD = ", round(median_td + sd_td, 1)), color = "black") +
   theme_bw()
 
-ggsave(p, "snp_depth_plot.png", width = "12", height = "8", units = "in")
+ggsave(p, "snp_depth_plot_pver_all.png", width = "12", height = "8", units = "in")
 ```
-![image](https://github.com/user-attachments/assets/45b1c578-305e-4af1-8440-399d1d9023e6)
+![](https://github.com/user-attachments/assets/45b1c578-305e-4af1-8440-399d1d9023e6)
 
 <br>
 
@@ -1862,7 +1862,7 @@ ldplot <- ggplot(ld_summary, aes(x = DIST_BIN/1000, y = mean_r2)) +
 
 ggsave(ldplot, file = "ld_decay_plot.pdf")
 ```
-![image](https://github.com/user-attachments/assets/75bbc400-7b23-4e7b-b3fc-3fff19f10c57)
+![](https://github.com/user-attachments/assets/75bbc400-7b23-4e7b-b3fc-3fff19f10c57)
 The plot shows that **LD declines well below 0.2 by 10 kb**, so I will use that as my window size for pruning.
 
 <br>
