@@ -1943,6 +1943,9 @@ crun.plink plink2 \
 `--pca 10` calculates the first 10 principal components using exact PCA. For fast approximate PCA (very efficient, but less accurate), use pca approx 10.
 
 Plot PCA in R:
+`plot_PCA_pver_all_samples.R`
 ```r
 
 ```
+![image](https://github.com/user-attachments/assets/761a8c48-65be-4333-b37f-776d3d129a45)
+![image](https://github.com/user-attachments/assets/72b7f514-8ab8-49a1-a130-4ab11b331a3c)
