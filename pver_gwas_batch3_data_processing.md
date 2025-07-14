@@ -1945,11 +1945,218 @@ crun.plink plink2 \
 Plot PCA in R:
 `plot_PCA_pver_all_samples.R`
 ```r
+# Plot PCAs from VCFs - Pver all samples
+# 2025-07-02
+# Jason A. Toy
 
+rm(list = ls())
+
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf")
+
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+
+# Load eigenvectors and eigenvalues
+eigenvec <- read.delim("pver_all_ld_pruned_0.2_pca.eigenvec", header = TRUE, sep = "\t")
+eigenval <- read.delim("pver_all_ld_pruned_0.2_pca.eigenval", header = FALSE)
+
+# Calculate percentage of variance explained
+percent_var <- (eigenval$V1 / sum(eigenval$V1)) * 100
+# 15.831364 12.598753 11.226283 10.414841  9.833342  9.137878  8.641080  8.411272  7.321766  6.583421
+
+# Scree Plot
+scree <- percent_var %>% as_tibble %>% rownames_to_column() %>% dplyr::rename(PC = rowname) %>% mutate(PC = as.numeric(PC))
+
+ggplot(scree, aes(x = PC, y = value)) +
+  geom_point() + 
+  geom_line() + 
+  ylab("Percent variance") +
+  theme_minimal()
+
+
+# Modify eigenvec for plotting
+eigenvec_plot <- eigenvec %>%
+  separate(X.IID, into = c("Year", "Location", "Species", "Genotype", "Lib_ID"), sep = "_", extra = "merge") %>% 
+  mutate(Geno_ID = paste0(Location, "_", Species, "_", Genotype)) %>% 
+  mutate(Species = as.factor(Species),
+         Location = as.factor(Location))
+
+
+# Plot PCAs
+library(ggsci)
+mypal <- pal_d3("category20")(11)
+
+# PC 1/2
+PC12 <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Location, color = Species)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_shape_manual(values = c(0:10)) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+
+# color by species, all dots
+PC12_noshape <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, color = Species)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  theme_bw()
+PC12_noshape
+
+# faceted by species
+PC12_species <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Species) +
+  theme_bw()
+
+# faceted by location
+PC12_location <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+
+
+# PC 3/4
+PC34 <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Location, color = Species)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_shape_manual(values = c(0:10)) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  theme_minimal()
+PC34
+
+# color by species, all dots
+PC34_noshape <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, color = Species)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  theme_minimal()
+PC34_noshape
+
+# faceted by species
+PC34_species <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Species) +
+  theme_bw()
+PC34_species
+
+# faceted by location
+PC34_location <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+PC34_location
+
+
+
+# combo plots
+library(cowplot)
+plot_grid(PC12_location, PC34_location, ncol = 2)
+plot_grid(PC12_species, PC34_species, ncol = 2)
+plot_grid(PC12, PC34, ncol = 2)
+plot_grid(PC12_noshape, PC34_noshape)
+
+
+
+# 3D plots
+library(plotly)
+
+# PCs 1-3
+plot_ly(
+  data = eigenvec_plot,
+  x = ~PC1,
+  y = ~PC2,
+  z = ~PC3,
+  color = ~Species,
+  colors = mypal[c(1,2)],
+  text = ~Geno_ID,
+  type = 'scatter3d',
+  mode = 'markers',
+  marker = list(size = 3)
+) %>%
+  layout(
+    scene = list(
+      xaxis = list(title = paste0("PC1: ", round(percent_var[1], 2), "% variance")),
+      yaxis = list(title = paste0("PC2: ", round(percent_var[2], 2), "% variance")),
+      zaxis = list(title = paste0("PC3: ", round(percent_var[3], 2), "% variance"))
+    )
+  )
+
+
+# PCs 4-6
+plot_ly(
+  data = eigenvec_plot,
+  x = ~PC4,
+  y = ~PC5,
+  z = ~PC6,
+  color = ~Species,
+  colors = mypal[c(1,2)],
+  text = ~Geno_ID,
+  type = 'scatter3d',
+  mode = 'markers',
+  marker = list(size = 3)
+) %>%
+  layout(
+    scene = list(
+      xaxis = list(title = paste0("PC4: ", round(percent_var[4], 2), "% variance")),
+      yaxis = list(title = paste0("PC5: ", round(percent_var[5], 2), "% variance")),
+      zaxis = list(title = paste0("PC6: ", round(percent_var[6], 2), "% variance"))
+    )
+  )
+
+
+
+
+# Plot various PC combinations
+# PC 3/5
+ggplot(eigenvec_plot %>% filter(Species == "Pspp"), aes(x = PC3, y = PC5, color = Species)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_shape_manual(values = c(0:10)) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  geom_text_repel(data = subset(eigenvec_plot, Species == "Pspp"), 
+                  aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+
+# PCs 3 and 5 seem to do the best job of separating out the Pspp samples from the rest
 ```
 ![image](https://github.com/user-attachments/assets/761a8c48-65be-4333-b37f-776d3d129a45)
 ![image](https://github.com/user-attachments/assets/72b7f514-8ab8-49a1-a130-4ab11b331a3c)
 ![image](https://github.com/user-attachments/assets/8aac0058-b0eb-4064-be11-85c8117c041d)
+\  
 
+Insights:
 
+- PC 1 (15.8%) seems to separate out a cryptic species, present at Maloata and Vatia, that we did not visually distinguish in the field (we did NOT label them as Pspp).
+    - 5 individuals from Vatia and many individuals from Fagasa fall at an intermediate position along this PC axis (potential hybrids?).
+- PC 2 (12.6%) seems to separate out another cryptic species that we did not visually distinguish in the field, but which was only sampled at Ofu Pool 600.
+    - No intermediate individuals between this group and the main cluster
+    - To a lesser extent, this axis also separates out 6 of the 13 "Pspp" samples at it's opposite end, but many samples labeled as "Pver" also fall out at or near this position.
+- PC 3 (11.2%) clearly separates out 6 of the 13 unknown "Pspp" samples we collected, in addition to a few samples (ALOF 01, MALO 21, and VATI 18) that were labeled as "Pver". Additionally, ALOF X1 falls at an intermediate position along this axis.
+- PC 4 (10.4%) seems to separate out yet another cryptic species that we did not visually distinguish in the field, but which was only sampled at Faga'alu (13 individuals). Furthermore, it also splits the individuals from AOAA into two groups with 3 samples intermediate between them. In other words, this PC splits all individuals collected into 3 major clusters.
+- PC 5 clusters individuals similarly to PC 3 (separates the same 6 "Pspp" samples, ALOF X1, and the three samples labeled as "Pver"), but also splits the other "Pver" samples from most locations into two groups (but the location of these groups in PC spaces varies by location). The exceptions to this were Fagatele and Leone, which had very little spread along this axis.
 
