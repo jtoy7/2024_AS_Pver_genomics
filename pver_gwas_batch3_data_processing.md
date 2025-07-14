@@ -2261,6 +2261,16 @@ First make lookup table for value of K and replicate number for each planned run
 10      3
 ```
 
+Next, chromosome/scaffold names need to be changed in the .bim file becuase ADMIXTURE only allows them to be strings of numbers:
+```bash
+# create new bim file with altered chromosome names
+sed -E 's/N[A-Z]_([0-9]+)\.1_Pverrucosa/\1/g' pver_all_ld_pruned_0.2_genotypes.bim > admixture.bim
+
+# backup original bim and replace with new bim file
+mv pver_all_ld_pruned_0.2_genotypes.bim pver_all_ld_pruned_0.2_genotypes_original.bim
+mv admixture.bim pver_all_ld_pruned_0.2_genotypes.bim
+```
+
 `admixture_array.slurm`
 ```bash
 #!/bin/bash
