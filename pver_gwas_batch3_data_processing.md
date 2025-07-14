@@ -1966,12 +1966,22 @@ percent_var <- (eigenval$V1 / sum(eigenval$V1)) * 100
 # 15.831364 12.598753 11.226283 10.414841  9.833342  9.137878  8.641080  8.411272  7.321766  6.583421
 
 # Scree Plot
-scree <- percent_var %>% as_tibble %>% rownames_to_column() %>% dplyr::rename(PC = rowname) %>% mutate(PC = as.numeric(PC))
+scree <- percent_var %>%
+  as_tibble %>%
+  rownames_to_column() %>%
+  dplyr::rename(PC = rowname) %>% 
+  mutate(PC = as.integer(PC)) %>% 
+  mutate(cumulative = cumsum(value))
 
-ggplot(scree, aes(x = PC, y = value)) +
-  geom_point() + 
-  geom_line() + 
-  ylab("Percent variance") +
+ggplot(scree) +
+  geom_point(aes(x = PC, y = value, color = "per PC")) + 
+  geom_line(aes(x = PC, y = value, color = "per PC")) + 
+  geom_point(aes(x = PC, y = cumulative/10, color = "cumulative/10"), size = 1) +
+  geom_line(aes(x = PC, y = cumulative/10, color = "cumulative/10"), linetype = "dashed") +
+  scale_color_manual(name = "", values = c("per PC" = "darkred", "cumulative/10" = "lightblue")) +
+  ylab("Percent variance explained") +
+  scale_x_continuous(breaks = 1:10, minor_breaks = NULL) +
+  scale_y_continuous(breaks = 1:16, minor_breaks = NULL) +
   theme_minimal()
 
 
@@ -2022,7 +2032,7 @@ PC12_location <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Species, co
   geom_point(size = 2, alpha = 0.5) +
   xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
   ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
-  geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
   facet_wrap(~ Location) +
   theme_bw()
 
@@ -2143,6 +2153,50 @@ ggplot(eigenvec_plot %>% filter(Species == "Pspp"), aes(x = PC3, y = PC5, color 
   theme_bw()
 
 # PCs 3 and 5 seem to do the best job of separating out the Pspp samples from the rest
+
+# faceted by location
+PC35_location <- ggplot(eigenvec_plot, aes(x = PC3, y = PC5, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+PC35_location
+
+
+# Check remaining PCs
+# PC 6/7
+ggplot(eigenvec_plot, aes(x = PC6, y = PC7, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  ylab(paste0("PC7: ", round(percent_var[7], 2), "% variance")) +
+  geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+
+# PC 8/9
+ggplot(eigenvec_plot, aes(x = PC8, y = PC9, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC8: ", round(percent_var[8], 2), "% variance")) +
+  ylab(paste0("PC9: ", round(percent_var[9], 2), "% variance")) +
+  geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+
+# PC 9/10
+ggplot(eigenvec_plot, aes(x = PC8, y = PC10, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC9: ", round(percent_var[9], 2), "% variance")) +
+  ylab(paste0("PC10: ", round(percent_var[10], 2), "% variance")) +
+  geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+
 ```
 ![image](https://github.com/user-attachments/assets/761a8c48-65be-4333-b37f-776d3d129a45)
 ![image](https://github.com/user-attachments/assets/72b7f514-8ab8-49a1-a130-4ab11b331a3c)
@@ -2160,3 +2214,98 @@ Insights:
 - PC 4 (10.4%) seems to separate out yet another cryptic species that we did not visually distinguish in the field, but which was only sampled at Faga'alu (13 individuals). Furthermore, it also splits the individuals from AOAA into two groups with 3 samples intermediate between them. In other words, this PC splits all individuals collected into 3 major clusters.
 - PC 5 (9.8%) clusters individuals similarly to PC 3 (separates the same 6 "Pspp" samples, ALOF X1, and the three samples labeled as "Pver"), but also splits the other "Pver" samples from most locations into two groups (but the location of these groups in PC spaces varies by location). The exceptions to this were Fagatele and Leone, which had very little spread along this axis.
 
+
+## Admixture/ancestry analysis
+### Using ADMIXTURE v1.3.0
+
+First need to convert PLINK2 files to PLINK1 .bed format:
+```bash
+crun.plink plink2 \
+  --pfile pver_all_ld_pruned_0.2_genotypes \
+  --make-bed \
+  --out pver_all_ld_pruned_0.2_genotypes
+```
+
+### Run ADMIXTURE with cross-validation for K=1-10 across 3 replicate runs
+First make lookup table for value of K and replicate number for each planned run:
+```
+1       1
+1       2
+1       3
+2       1
+2       2
+2       3
+3       1
+3       2
+3       3
+4       1
+4       2
+4       3
+5       1
+5       2
+5       3
+6       1
+6       2
+6       3
+7       1
+7       2
+7       3
+8       1
+8       2
+8       3
+9       1
+9       2
+9       3
+10      1
+10      2
+10      3
+```
+
+`admixture_array.slurm`
+```bash
+#!/bin/bash
+#SBATCH --job-name=admixture_array_pver_2025-07-14
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-30%30     # 10 K values * 3 replicates each = 30 tasks
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=30G
+#SBATCH --time=5-00:00:00
+
+# Load modules
+module load container_env admixture/1.3
+
+
+# Set working directory
+BASEDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/
+cd $BASEDIR/admixture
+
+# Define max K and replicates
+LINE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $BASEDIR/admixture/k_rep_table.txt)    # pulls out line from lookup table
+read K REP <<< "$LINE"                                                         # uses the "here string" bash operator to provide a string as input to a command as if it came from stdin
+                                                                               # "read" splits the string by whitespace and assigns each part to the variables "K" and "REP"
+
+# Print info for logging
+echo "Running ADMIXTURE for K=${K}, Replicate=${REP}, Task ID=${SLURM_ARRAY_TASK_ID}"
+
+# Define input file
+INPUT=$BASEDIR/vcf/pver_all_ld_pruned_0.2_genotypes.bed
+
+# Output prefix (can help organize results)
+OUTPUT_PREFIX="admixture_K${K}_rep${REP}"
+
+
+# Run ADMIXTURE with 8 threads
+crun.admixture admixture --cv=10 -j8 $INPUT $K > ${OUTPUT_PREFIX}.log 2>&1
+
+
+# Rename output files to avoid overwriting
+mv pver_all_ld_pruned_0.2_genotypes.${K}.Q ${OUTPUT_PREFIX}.Q
+mv pver_all_ld_pruned_0.2_genotypes.${K}.P ${OUTPUT_PREFIX}.P
+
+echo "Run $OUTPUT_PREFIX completed."
+```
