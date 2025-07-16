@@ -2310,7 +2310,7 @@ OUTPUT_PREFIX="admixture_K${K}_rep${REP}"
 
 
 # Run ADMIXTURE with 8 threads
-crun.admixture admixture --cv=10 -j8 $INPUT $K > ${OUTPUT_PREFIX}.log 2>&1
+crun.admixture admixture --seed=$SLURM_ARRAY_TASK_ID --cv=10 -j8 $INPUT $K > ${OUTPUT_PREFIX}.log 2>&1
 
 
 # Rename output files to avoid overwriting
@@ -2318,4 +2318,68 @@ mv pver_all_ld_pruned_0.2_genotypes.${K}.Q ${OUTPUT_PREFIX}.Q
 mv pver_all_ld_pruned_0.2_genotypes.${K}.P ${OUTPUT_PREFIX}.P
 
 echo "Run $OUTPUT_PREFIX completed."
+```
+
+Compile cross-validation error results across runs:
+```bash
+for FILE in admixture_K*_rep*.log; do
+  K=$(echo $FILE | grep -oP 'K\d+')
+  REP=$(echo $FILE | grep -oP 'rep\d+')
+  CVERR=$(grep "CV error" $FILE | awk -F": " '{print $2}')
+  echo -e "$K\t$REP\t$CVERR"
+done > cv_summary.tsv
+```
+
+Plot cross validation error to look for best K:
+`plot_admixture_results.R`
+```r
+# Ancestry analysis with ADMIXTURE - Pver all samples
+# 2025-07-14
+# Jason A. Toy
+
+rm(list = ls())
+
+library(tidyverse)
+
+
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/admixture")
+
+
+# load cross validation errors for all runs (3 runs x 10 K values)
+cv <- read_tsv("cv_summary.tsv", col_names = c("K", "Rep", "CV_Error")) %>%
+  mutate(K = str_remove(K, "K") %>% as.numeric(),
+         Rep = str_remove(Rep, "rep") %>% as.numeric)
+
+# calculate mean and sd
+cvsum <- cv %>% group_by(K) %>% summarize(Mean_CV = mean(CV_Error), SD = sd(CV_Error))
+
+# plot CV Error vs. K
+ggplot(cvsum, aes(x = K, y = Mean_CV)) +
+  geom_line(color = "deepskyblue3", linewidth = 1) +
+  geom_point(size = 2, color = "deepskyblue3") +
+  geom_errorbar(aes(ymin = Mean_CV - SD, ymax = Mean_CV + SD), width = 0.1, color = "gray50") +
+  scale_x_continuous(breaks = cvsum$K) +
+  labs(title = "ADMIXTURE CV Error by K",
+       x = "Number of Ancestral Populations (K)",
+       y = "Mean CV Error ± SD") +
+  theme_bw(base_size = 14)
+```
+
+
+There really isn't an "elbow" in the plot. The biggest decrease in CV is from K=1 to K=2 and the rest of the decreases are pretty equal and not that much smaller than the initial drop. One possiblility is that the best K is actually >10 so I created a new k_rep_table.txt file for K=11-20 and reran the `admixture_array.slurm` script.
+
+Re-compile cross-validation error results across runs:
+```bash
+for FILE in admixture_K*_rep*.log; do
+  K=$(echo $FILE | grep -oP 'K\d+')
+  REP=$(echo $FILE | grep -oP 'rep\d+')
+  CVERR=$(grep "CV error" $FILE | awk -F": " '{print $2}')
+  echo -e "$K\t$REP\t$CVERR"
+done > cv_summary.tsv
+```
+
+Re-plot cross validation error to look for best K:
+`plot_admixture_results.R`
+```r
+
 ```
