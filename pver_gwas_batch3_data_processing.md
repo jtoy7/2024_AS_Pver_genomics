@@ -1633,6 +1633,18 @@ $GATK --java-options "-Xmx95g" GenotypeGVCFs \
   -O $OUTDIR/${SCAF}_genotypes.vcf.gz
 ```
 
+Checking the .err files, there are a few warning messages that appear:
+```
+Chromosome NC_089321.1_Pverrucosa position 2941072 (TileDB column 251074565) has too many alleles in the combined VCF record : 62 : current limit : 50. Fields, such as  PL, with length equal to the number of genotypes will NOT be added for this location.
+02:00:43.651 WARN  MinimalGenotypingEngine - Attempting to genotype more than 50 alleles. Site will be skipped at location NC_089321.1_Pverrucosa:2941072
+
+Sample/Callset 2024_ALOF_Pspp_X1_1( TileDB row idx 0) at Chromosome NC_089321.1_Pverrucosa position 3250313 (TileDB column 251383806) has too many genotypes in the combined VCF record : 1176 : current limit : 1024 (num_alleles, ploidy) = (48, 2). Fields, such as  PL, with length equal to the number of genotypes will NOT be added for this sample for this location.
+
+02:15:04.517 WARN  MinimalGenotypingEngine - No genotype contained sufficient data to recalculate site and allele qualities. Site will be skipped at location NC_089321.1_Pverrucosa:3250313
+```
+These are all related and expected warnings for WGS data in a nonmodel organism. They are caused by hyper-variable sites with more than 50 different alleles, likely caused by issues with the reference sequence, misalignments, or repeat regions. These likely low-quality and multiallelic sites will get filtered out of the VCF downsteam anyway. These warnings occurred 318, 101376, and 256 times respectively across all .err files for the array job. 
+
+
 Once genotyping is complete, there will we a separate vcf for each genomic region (scaffold/contig). Combine them into a single multi-sample VCF with BCFtools:
 ```bash
 # make list of vcf files
@@ -2320,14 +2332,15 @@ mv pver_all_ld_pruned_0.2_genotypes.${K}.P ${OUTPUT_PREFIX}.P
 echo "Run $OUTPUT_PREFIX completed."
 ```
 
-Compile cross-validation error results across runs:
+Compile cross-validation error results and log-likelihood across runs:
 ```bash
 for FILE in admixture_K*_rep*.log; do
   K=$(echo $FILE | grep -oP 'K\d+')
   REP=$(echo $FILE | grep -oP 'rep\d+')
   CVERR=$(grep "CV error" $FILE | awk -F": " '{print $2}')
-  echo -e "$K\t$REP\t$CVERR"
-done > cv_summary.tsv
+  LOGLIK=$(grep -oP 'Loglikelihood:\s+\K-?(.\d+\.?\d+?)$' "$FILE")
+  echo -e "$K\t$REP\t$CVERR\t$LOGLIK"
+done > cv_loglik_summary.tsv
 ```
 
 Plot cross validation error to look for best K:
