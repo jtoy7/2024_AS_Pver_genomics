@@ -2012,26 +2012,38 @@ mypal <- pal_d3("category20")(11)
 # PC 1/2
 PC12 <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Location, color = Species)) +
   scale_color_manual(values = mypal) +
-  geom_point(size = 2, alpha = 0.5) +
+  geom_point(size = 2, alpha = 0.3) +
   scale_shape_manual(values = c(0:10)) +
   xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
   ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
   #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
   theme_bw()
+PC12
 
 # color by species, all dots
 PC12_noshape <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, color = Species)) +
   scale_color_manual(values = mypal) +
-  geom_point(size = 2, alpha = 0.5) +
+  geom_point(size = 1.5, alpha = 0.3) +
   xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
   ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
   theme_bw()
 PC12_noshape
 
+# color by location, all dots, shape by species
+PC12_color <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(15, 16)) +
+  geom_point(size = 2, alpha = 0.3) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+PC12_color
+
 # faceted by species
 PC12_species <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Species, color = Location)) +
   scale_color_manual(values = mypal) +
-  geom_point(size = 2, alpha = 0.5) +
+  geom_point(size = 1.5, alpha = 0.3) +
   xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
   ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
   #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
@@ -2041,18 +2053,21 @@ PC12_species <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Species, col
 # faceted by location
 PC12_location <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Species, color = Location)) +
   scale_color_manual(values = mypal) +
-  geom_point(size = 2, alpha = 0.5) +
+  geom_point(size = 1.5, alpha = 0.3) +
   xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
   ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
   #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
   facet_wrap(~ Location) +
   theme_bw()
+PC12_location
+
+
 
 
 # PC 3/4
 PC34 <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Location, color = Species)) +
   scale_color_manual(values = mypal) +
-  geom_point(size = 2, alpha = 0.5) +
+  geom_point(size = 1.5, alpha = 0.3) +
   scale_shape_manual(values = c(0:10)) +
   xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
   ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
@@ -2063,12 +2078,23 @@ PC34
 # color by species, all dots
 PC34_noshape <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, color = Species)) +
   scale_color_manual(values = mypal) +
-  geom_point(size = 2, alpha = 0.5) +
+  geom_point(size = 1.5, alpha = 0.3) +
   xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
   ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
   #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
   theme_minimal()
 PC34_noshape
+
+# color by location, all dots, shape by species
+PC34_color <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(15, 16)) +
+  geom_point(size = 2, alpha = 0.3) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+PC34_color
 
 # faceted by species
 PC34_species <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Species, color = Location)) +
@@ -2094,12 +2120,74 @@ PC34_location
 
 
 
+
+# PC56
+PC56 <- ggplot(eigenvec_plot, aes(x = PC5, y = PC6, shape = Location, color = Species)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 1.5, alpha = 0.3) +
+  scale_shape_manual(values = c(0:10)) +
+  xlab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  ylab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  theme_minimal()
+PC56
+
+# color by species, all dots
+PC56_noshape <- ggplot(eigenvec_plot, aes(x = PC5, y = PC6, color = Species)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 1.5, alpha = 0.3) +
+  xlab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  ylab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  theme_minimal()
+PC56_noshape
+
+# color by location, all dots, shape by species
+PC56_color <- ggplot(eigenvec_plot, aes(x = PC5, y = PC6, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(15, 16)) +
+  geom_point(size = 2, alpha = 0.3) +
+  xlab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  ylab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+PC56_color
+
+# faceted by species
+PC56_species <- ggplot(eigenvec_plot, aes(x = PC5, y = PC6, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  ylab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Species) +
+  theme_bw()
+PC56_species
+
+# faceted by location
+PC56_location <- ggplot(eigenvec_plot, aes(x = PC5, y = PC6, shape = Species, color = Location)) +
+  scale_color_manual(values = mypal) +
+  geom_point(size = 2, alpha = 0.5) +
+  xlab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  ylab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+PC56_location
+
+
+
+
+
 # combo plots
 library(cowplot)
 plot_grid(PC12_location, PC34_location, ncol = 2)
 plot_grid(PC12_species, PC34_species, ncol = 2)
 plot_grid(PC12, PC34, ncol = 2)
 plot_grid(PC12_noshape, PC34_noshape)
+plot_grid(PC12_color, PC34_color, PC56_color, ncol = 3)
+
+
 
 
 
@@ -2112,8 +2200,10 @@ plot_ly(
   x = ~PC1,
   y = ~PC2,
   z = ~PC3,
-  color = ~Species,
-  colors = mypal[c(1,2)],
+  color = ~Location,
+  colors = mypal,
+  symbol = ~Species,
+  symbols = c("square", "circle"),
   text = ~Geno_ID,
   type = 'scatter3d',
   mode = 'markers',
@@ -2134,8 +2224,10 @@ plot_ly(
   x = ~PC4,
   y = ~PC5,
   z = ~PC6,
-  color = ~Species,
-  colors = mypal[c(1,2)],
+  color = ~Location,
+  colors = mypal,
+  symbol = ~Species,
+  symbols = c("square", "circle"),
   text = ~Geno_ID,
   type = 'scatter3d',
   mode = 'markers',
@@ -2148,6 +2240,7 @@ plot_ly(
       zaxis = list(title = paste0("PC6: ", round(percent_var[6], 2), "% variance"))
     )
   )
+
 
 
 
@@ -2208,7 +2301,6 @@ ggplot(eigenvec_plot, aes(x = PC8, y = PC10, shape = Species, color = Location))
   geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
   facet_wrap(~ Location) +
   theme_bw()
-
 ```
 ![image](https://github.com/user-attachments/assets/109cd80c-259e-4723-a5ce-b9c059116d41)
 ![image](https://github.com/user-attachments/assets/1a192a30-a429-4669-b439-7bf01d96750e)
@@ -2412,6 +2504,15 @@ Calculate Identity-by-state distance (1 - proportion of alleles shared) with PLI
 # load PLINK v1.9
 module load plink/1.9-20240319
 
+# calculate distance matrix
+crun.plink plink \
+	--bfile pver_all_ld_pruned_0.2_genotypes \
+	--allow-extra-chr \
+	--distance square 1-ibs \
+	--out pver_all_ld_pruned_0.2_mdist
+
+
+# calculate clustering and mds that may be useful for later analyses
 crun.plink plink \
   --bfile pver_all_ld_pruned_0.2_genotypes \
   --distance square ibs \
@@ -2423,7 +2524,59 @@ crun.plink plink \
 parameters:
   --distance square ibs                       # calculates IBS distances
   --cluster                                   # does hierarchal clustering (UPGMA) for you based on the distance matrix
-  --mds-plot 10                               # does nMDS for you and gives coordinates as output
+  --mds-plot 10                               # does MDS (PCoA) for you and gives coordinates as output
   --allow-extra-chr                           # allows nonstandard chromosome names
 
-  
+
+Run nMDS in R:
+```r
+library(vegan)
+
+# Read distance matrix
+dist_matrix <- as.matrix(read.table("pver_all_ld_pruned_0.2_mdist.mdist"))
+sample_ids <- read.table("pver_all_ld_pruned_0.2_mdist.mdist.id")$V2
+
+# Assign row/col names to distance matrix
+rownames(dist_matrix) <- sample_ids
+colnames(dist_matrix) <- sample_ids
+
+# Compute nMDS
+set.seed(123)  # for reproducibility
+nmds_results <- metaMDS(dist_matrix, k = 2, trymax = 100)
+
+# View stress
+nmds_results$stress
+  # stress is small (0.059; less than 0.1), which is good
+
+# Get the scores (site coordinates in reduced space)
+nmds_scores <- as.data.frame(scores(nmds_results))
+nmds_scores$SampleID <- rownames(nmds_scores)
+
+nmds_plotdat <- nmds_scores %>% 
+  separate(SampleID, into = c("Year", "Location", "Species", "Genotype", "Rep"), sep = "_", remove = FALSE) %>% 
+  mutate(Location = as.factor(Location),
+         Species = as.factor(Species))
+
+# Plot all samples
+ggplot(nmds_plotdat, aes(x = NMDS1, y = NMDS2, shape = Species, color = Location)) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(15, 16)) +
+  geom_point(size = 2, alpha = 0.3) +
+  theme_minimal() +
+  labs(title = "nMDS all samples", x = "NMDS1", y = "NMDS2")
+
+# Restrict x-axis to remove likely Pocillopora eydouxi
+ggplot(nmds_plotdat, aes(x = NMDS1, y = NMDS2, shape = Species, color = Location)) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(15, 16)) +
+  geom_point(size = 2, alpha = 0.3) +
+  xlim(c(0.0, 0.015)) +
+  theme_minimal() +
+  labs(title = "nMDS of Whole Genome SNP Data", x = "NMDS1", y = "NMDS2")
+```
+
+![image](https://github.com/user-attachments/assets/ccd71076-f579-4a20-911a-d42b9e07fbf1)
+![image](https://github.com/user-attachments/assets/7435b4dc-9fd5-400e-bae7-dbbbbee4390a)
+
