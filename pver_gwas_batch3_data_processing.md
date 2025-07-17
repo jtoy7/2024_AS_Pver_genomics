@@ -2211,6 +2211,11 @@ ggplot(eigenvec_plot, aes(x = PC8, y = PC10, shape = Species, color = Location))
 
 ```
 ![image](https://github.com/user-attachments/assets/109cd80c-259e-4723-a5ce-b9c059116d41)
+![image](https://github.com/user-attachments/assets/1a192a30-a429-4669-b439-7bf01d96750e)
+![image](https://github.com/user-attachments/assets/991f224e-8a50-427a-83af-518325ec0770)
+
+
+
 ![image](https://github.com/user-attachments/assets/761a8c48-65be-4333-b37f-776d3d129a45)
 ![image](https://github.com/user-attachments/assets/72b7f514-8ab8-49a1-a130-4ab11b331a3c)
 ![image](https://github.com/user-attachments/assets/8aac0058-b0eb-4064-be11-85c8117c041d)
