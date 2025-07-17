@@ -2396,3 +2396,26 @@ Re-plot cross validation error to look for best K:
 ```r
 
 ```
+
+
+## nMDS
+Calculate Identity-by-state distance (1 - proportion of alleles shared) with PLINK1:
+```bash
+# load PLINK v1.9
+module load plink/1.9-20240319
+
+crun.plink plink \
+  --bfile pver_all_ld_pruned_0.2_genotypes \
+  --distance square ibs \
+  --cluster \
+  --mds-plot 10 \
+  --out pver_all_ld_pruned_0.2_ibsdist \
+  --allow-extra-chr
+```
+parameters:
+  --distance square ibs                       # calculates IBS distances
+  --cluster                                   # does hierarchal clustering (UPGMA) for you based on the distance matrix
+  --mds-plot 10                               # does nMDS for you and gives coordinates as output
+  --allow-extra-chr                           # allows nonstandard chromosome names
+
+  
