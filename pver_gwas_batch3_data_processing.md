@@ -2578,5 +2578,5 @@ ggplot(nmds_plotdat, aes(x = NMDS1, y = NMDS2, shape = Species, color = Location
 ```
 
 ![image](https://github.com/user-attachments/assets/ccd71076-f579-4a20-911a-d42b9e07fbf1)
-![image](https://github.com/user-attachments/assets/7435b4dc-9fd5-400e-bae7-dbbbbee4390a)
+![image](https://github.com/user-attachments/assets/c93f432e-22ac-4539-8d30-6a752a26f286)
 
