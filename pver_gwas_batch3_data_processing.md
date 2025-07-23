@@ -2522,6 +2522,7 @@ crun.plink plink \
   --allow-extra-chr
 ```
 parameters:
+
   --distance square ibs                       # calculates IBS distances
   --cluster                                   # does hierarchal clustering (UPGMA) for you based on the distance matrix
   --mds-plot 10                               # does MDS (PCoA) for you and gives coordinates as output
@@ -2580,3 +2581,337 @@ ggplot(nmds_plotdat, aes(x = NMDS1, y = NMDS2, shape = Species, color = Location
 ![image](https://github.com/user-attachments/assets/ccd71076-f579-4a20-911a-d42b9e07fbf1)
 ![image](https://github.com/user-attachments/assets/c93f432e-22ac-4539-8d30-6a752a26f286)
 
+
+## Identify clones by recalculating 1-IBS distances based on unpruned SNP set
+This is the set of 1,134,549 SNPs produced prior to LD-pruning, but after filtering by missingness, MAF, and allele number
+
+First convert the VCF to PLINK binary format:
+```bash
+# Load PLINK2
+module load plink/2024.03.02
+
+crun.plink plink2 \
+  --pfile pver_all_MISSMAFfiltered_genotypes \
+  --make-bed \
+  --out pver_all_MISSMAFfiltered_genotypes
+```
+
+Then calculate 1 - IBS distance matrix:
+```bash
+# Load PLINK1.9
+module load plink/1.9-20240319
+
+crun.plink plink\
+  --bfile pver_all_MISSMAFfiltered_genotypes \
+  --distance square 1-ibs \
+  --out pver_all_MISSMAFfiltered_genotypes_mdist \
+  --allow-extra-chr
+```
+
+Plot dendrogram in R:
+```
+# Read distance matrix (1-IBS) for UNPRUNED SNP set
+dist_matrix_up <- as.matrix(read.table("pver_all_MISSMAFfiltered_genotypes_mdist.mdist"))
+sample_ids_up <- read.table("pver_all_MISSMAFfiltered_genotypes_mdist.mdist.id")$V2
+
+# Assign row/col names to distance matrix
+rownames(dist_matrix_up) <- sample_ids_up
+colnames(dist_matrix_up) <- sample_ids_up
+
+# Convert distance matrix to a dist object
+dist_obj_up <- as.dist(dist_matrix_up)
+
+# Hierarchical clustering (default method = "complete")
+hc_up <- hclust(dist_obj_up, method = "ward.D2")
+
+# Simple plot
+plot(hc_up, main = "Hierarchical Clustering of Samples (unpruned SNP set)", cex = 0.4)
+```
+
+Results aren't much different than the hierarchical clustering of the pruned SNP set. Let's try using identity-by-descent (IBD) instead.
+
+## Identify clones by calculateing IBD with pruned dataset
+
+Calculate proportion identity-by-descent (PI_HAT) with PLINK1 using --genome flag:
+```bash
+# load PLINK v1.9
+module load plink/1.9-20240319
+
+# calculate IBD (PI_HAT)
+crun.plink plink \
+	--bfile pver_all_ld_pruned_0.2_genotypes \
+	--allow-extra-chr \
+	--genome \
+	--out pver_all_ld_pruned_0.2_relatedness
+```
+
+Now identify clones in R with a PI_HAT threshold:
+```r
+relatedness <- read.table("pver_all_ld_pruned_0.2_relatedness.genome", header = TRUE) %>% 
+  separate(IID1, into = c("Year", "Location", "Species", "Genotype", "TechRep"), remove = FALSE) %>% 
+  separate(IID2, into = c("Year2", "Location2", "Species2", "Genotype2", "TechRep2"), remove = FALSE) %>% 
+  mutate(Sample1 = paste(Year, Location, Species, Genotype, sep = "_"),
+         Sample2 = paste(Year2, Location2, Species2, Genotype2, sep = "_")
+         )
+
+techreps <- relatedness %>% filter(Sample1 == Sample2)
+# Comparisons between the 4 samples with technical replicates have PI_HAT values of 0.8909, 0.8907, 0.9150, and 0.8998. This is lower than expected. Even with sequencing artifacts they should be > 0.95
+
+# Plot distribution of PI_HAT values
+ggplot(relatedness, aes(x = PI_HAT)) +
+  geom_histogram(binwidth = 0.01, fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Pairwise PI_HAT Distribution", x = "PI_HAT", y = "Count")
+# Vast majority of comparisons have PI_HAT of 0
+
+# Remove the 0 values to better visualize the rest of the distribution
+ggplot(relatedness %>% filter(PI_HAT > 0), aes(x = PI_HAT)) +
+  geom_histogram(binwidth = 0.01, fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Pairwise PI_HAT Distribution (non-zero)", x = "PI_HAT", y = "Count")
+```
+Clones have PI_HAT values of 0.8909, 0.8907, 0.9150, and 0.8998. This is lower than expected. Even with sequencing artifacts they should be > 0.95
+
+
+Compute genotype discordance with bcftools:
+```bash
+crun.bcftools bcftools gtcheck -p 2024_LEON_Pver_14_1,2024_LEON_Pver_14_2 pver_all_ld_pruned_0.2_genotypes.vcf > 2024_LEON_Pver_14.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_OFU6_Pver_09_1,2024_OFU6_Pver_09_2 pver_all_ld_pruned_0.2_genotypes.vcf > 2024_OFU6_Pver_09.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_FALU_Pver_23_1,2024_FALU_Pver_23_2 pver_all_ld_pruned_0.2_genotypes.vcf > 2024_FALU_Pver_23.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_FASA_Pver_34_1,2024_FASA_Pver_34_2 pver_all_ld_pruned_0.2_genotypes.vcf > 2024_FASA_Pver_34.gtcheck
+
+# add header line and combine across samples
+{
+grep "^#DC" 2024_LEON_Pver_14.gtcheck;
+for FILE in *.gtcheck; do
+	tail -n 1 $FILE
+done;
+} > all_techreps.gtchecksummary
+```
+```
+#DC     [2]Query Sample [3]Genotyped Sample     [4]Discordance  [5]-log P(HWE)  [6]Number of sites compared
+DC      2024_FALU_Pver_23_1     2024_FALU_Pver_23_2     1.790155e+04    2.404484e+05    80161
+DC      2024_FASA_Pver_34_1     2024_FASA_Pver_34_2     1.826797e+04    2.421047e+05    80154
+DC      2024_LEON_Pver_14_1     2024_LEON_Pver_14_2     1.575252e+04    2.428629e+05    80172
+DC      2024_OFU6_Pver_09_1     2024_OFU6_Pver_09_2     1.707957e+04    2.411082e+05    80173
+```
+These correspond to mismatch rates of ~20%, which is a lot more than expected for technical replicates.
+
+
+To see if SNP filtering is creating this issue rerun with less filtered VCFs:
+```bash
+crun.bcftools bcftools gtcheck -p 2024_LEON_Pver_14_1,2024_LEON_Pver_14_2 pver_all_MISSMAFfiltered_genotypes.vcf > 2024_LEON_Pver_14_unpruned.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_OFU6_Pver_09_1,2024_OFU6_Pver_09_2 pver_all_MISSMAFfiltered_genotypes.vcf > 2024_OFU6_Pver_09_unpruned.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_FALU_Pver_23_1,2024_FALU_Pver_23_2 pver_all_MISSMAFfiltered_genotypes.vcf > 2024_FALU_Pver_23_unpruned.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_FASA_Pver_34_1,2024_FASA_Pver_34_2 pver_all_MISSMAFfiltered_genotypes.vcf > 2024_FASA_Pver_34_unpruned.gtcheck
+
+# add header line and combine across samples
+{
+grep "^#DC" 2024_LEON_Pver_14_unpruned.gtcheck;
+for FILE in *_unpruned.gtcheck; do
+	tail -n 1 $FILE
+done;
+} > all_techreps_unpruned.gtchecksummary
+```
+```
+#DC     [2]Query Sample [3]Genotyped Sample     [4]Discordance  [5]-log P(HWE)  [6]Number of sites compared
+DC      2024_FALU_Pver_23_1     2024_FALU_Pver_23_2     4.974384e+04    3.459043e+06    1134466
+DC      2024_FASA_Pver_34_1     2024_FASA_Pver_34_2     5.648805e+04    3.453628e+06    1134454
+DC      2024_LEON_Pver_14_1     2024_LEON_Pver_14_2     4.232621e+04    3.481962e+06    1134487
+DC      2024_OFU6_Pver_09_1     2024_OFU6_Pver_09_2     4.966462e+04    3.452874e+06    1134489
+```
+This results in much lower discordance rates of ~5%.
+
+
+Recalculate again using the quality-filtered only vcf (5.255 million SNPs) to get rid of potential issues with MAF-filtering, which may also affect PI_HAT calculations:
+```bash
+crun.bcftools bcftools gtcheck -p 2024_LEON_Pver_14_1,2024_LEON_Pver_14_2 pver_all_QDPfiltered_genotypes.vcf.gz > 2024_LEON_Pver_14_noPLINKfilt.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_OFU6_Pver_09_1,2024_OFU6_Pver_09_2 pver_all_QDPfiltered_genotypes.vcf.gz > 2024_OFU6_Pver_09_noPLINKfilt.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_FALU_Pver_23_1,2024_FALU_Pver_23_2 pver_all_QDPfiltered_genotypes.vcf.gz > 2024_FALU_Pver_23_noPLINKfilt.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_FASA_Pver_34_1,2024_FASA_Pver_34_2 pver_all_QDPfiltered_genotypes.vcf.gz > 2024_FASA_Pver_34_noPLINKfilt.gtcheck
+
+# add header line and combine across samples
+{
+grep "^#DC" 2024_LEON_Pver_14_noPLINKfilt.gtcheck;
+for FILE in *_noPLINKfilt.gtcheck; do
+	tail -n 1 $FILE
+done;
+} > all_techreps_noPLINKfilt.gtchecksummary
+```
+```
+#DC     [2]Query Sample [3]Genotyped Sample     [4]Discordance  [5]-log P(HWE)  [6]Number of sites compared
+DC      2024_FALU_Pver_23_1     2024_FALU_Pver_23_2     3.751238e+05    4.435625e+07    4850604
+DC      2024_FASA_Pver_34_1     2024_FASA_Pver_34_2     3.918278e+05    4.433923e+07    4850604
+DC      2024_LEON_Pver_14_1     2024_LEON_Pver_14_2     3.689223e+05    4.440351e+07    4850604
+DC      2024_OFU6_Pver_09_1     2024_OFU6_Pver_09_2     3.564821e+05    4.442604e+07    4850604
+```
+This results in discordance rates of 7-8%.
+
+
+
+MAF filtering can also decrease PI_HAT estimates between technical replicates because it removes additional sites where replicates would be identical.
+It also enriches for common variants which are more likely to be heterozygous. Heterozygous sites are more prone to genotyping error or allelic dropout, which can also deflate PI_HAT between replicates.
+
+So lets try refiltering the initial quality/depth-filtered VCF without a MAF filter (filter based on missingess and remove indels and multiallelic SNPs):
+```bash
+crun.plink plink2 \
+  --vcf pver_all_QDPfiltered_genotypes.vcf.gz \
+  --snps-only just-acgt \
+  --max-alleles 2 \
+  --geno 0.2 \
+  --mind 0.2 \
+  --make-pgen \
+  --out pver_all_MISSfiltered_genotypes
+```
+```
+...
+0 samples removed due to missing genotype data (--mind).
+396 samples (0 females, 0 males, 396 ambiguous; 396 founders) remaining after main filters.
+Calculating allele frequencies... done.
+--geno: 8 variants removed due to missing genotype data.
+4585661 variants remaining after main filters.
+```
+
+
+Or with a much lower MAF filter:
+```bash
+module load plink/2024.03.02    # Note: this is PLINK2
+
+crun.plink plink2 \
+  --vcf pver_all_QDPfiltered_genotypes.vcf.gz \
+  --snps-only just-acgt \
+  --max-alleles 2 \
+  --geno 0.2 \
+  --mind 0.2 \
+  --maf 0.001 \
+  --make-pgen \
+  --out pver_all_MISSMAF001filtered_genotypes
+
+
+  # geno 0.2    removes SNPs where more than 20% of individuals have missing genotypes
+  # mind 0.2    removes individuals who are missing more than 20% of genotype data across all SNPs
+  # maf 0.05    removes SNPs where the minor allele frequency is less than 0.05
+  # threads N    multithreading option available
+```
+```
+...
+0 samples removed due to missing genotype data (--mind).
+396 samples (0 females, 0 males, 396 ambiguous; 396 founders) remaining after main filters.
+Calculating allele frequencies... done.
+--geno: 8 variants removed due to missing genotype data.
+42988 variants removed due to allele frequency threshold(s)
+4542673 variants remaining after main filters.
+```
+The MAF 0.001 filter only removes 42,988 SNPs, so I will continue with this set for recalculating PI_HAT
+
+Convert to VCF for viewing:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_MISSMAF001filtered_genotypes.pgen \
+  --psam pver_all_MISSMAF001filtered_genotypes.psam \
+  --pvar pver_all_MISSMAF001filtered_genotypes.pvar \
+  --recode vcf \
+  --out pver_all_MISSMAF001filtered_genotypes
+```
+This vcf has **4,542,673** SNPs remaining.
+
+Recalculate discordance between technical replicates
+```bash
+crun.bcftools bcftools gtcheck -p 2024_LEON_Pver_14_1,2024_LEON_Pver_14_2 pver_all_MISSMAF001filtered_genotypes.vcf > 2024_LEON_Pver_14_MAF001unpruned.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_OFU6_Pver_09_1,2024_OFU6_Pver_09_2 pver_all_MISSMAF001filtered_genotypes.vcf > 2024_OFU6_Pver_09_MAF001unpruned.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_FALU_Pver_23_1,2024_FALU_Pver_23_2 pver_all_MISSMAF001filtered_genotypes.vcf > 2024_FALU_Pver_23_MAF001unpruned.gtcheck
+crun.bcftools bcftools gtcheck -p 2024_FASA_Pver_34_1,2024_FASA_Pver_34_2 pver_all_MISSMAF001filtered_genotypes.vcf > 2024_FASA_Pver_34_MAF001unpruned.gtcheck
+
+# add header line and combine across samples
+{
+grep "^#DC" 2024_LEON_Pver_14_MAF001unpruned.gtcheck;
+for FILE in *_MAF001unpruned.gtcheck; do
+	tail -n 1 $FILE
+done;
+} > all_techreps_MAF001unpruned.gtchecksummary
+```
+```
+#DC     [2]Query Sample [3]Genotyped Sample     [4]Discordance  [5]-log P(HWE)  [6]Number of sites compared
+DC      2024_FALU_Pver_23_1     2024_FALU_Pver_23_2     7.220304e+04    4.192155e+07    4542558
+DC      2024_FASA_Pver_34_1     2024_FASA_Pver_34_2     7.927406e+04    4.193757e+07    4542543
+DC      2024_LEON_Pver_14_1     2024_LEON_Pver_14_2     6.182430e+04    4.196157e+07    4542588
+DC      2024_OFU6_Pver_09_1     2024_OFU6_Pver_09_2     7.100474e+04    4.192378e+07    4542581
+```
+This results in discordance rates between 1.3% and 1.8%. This is much more reasonable for technical replicates.
+
+
+To see how this compares to the similarity between other samples, recalculate PI_HAT:
+Convert VCF to PLINK1 binary format:
+```bash
+# Load PLINK2
+module load plink/2024.03.02
+
+crun.plink plink2 \
+  --pfile pver_all_MISSMAF001filtered_genotypes \
+  --make-bed \
+  --out pver_all_MISSMAF001filtered_genotypes
+```
+
+Run calculation:
+```bash
+# load PLINK v1.9
+module load plink/1.9-20240319
+
+# calculate IBD (PI_HAT)
+crun.plink plink \
+	--bfile pver_all_MISSMAF001filtered_genotypes \
+	--allow-extra-chr \
+	--genome full \
+	--out pver_all_MISSMAF001filtered_genotypes_relatedness
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Take a closer look at quality and depth of discordant sites for a given sample comparison.
+
+First compress vcfs into vcf.gz with bgzip:
+```bash
+# Compress the VCF file with bgzip
+crun.bcftools bgzip -c pver_all_MISSMAFfiltered_genotypes.vcf > pver_all_MISSMAFfiltered_genotypes.vcf.gz
+crun.bcftools bgzip -c pver_all_ld_pruned_0.2_genotypes.vcf > pver_all_ld_pruned_0.2_genotypes.vcf.gz
+
+# Index the compressed file
+crun.bcftools bcftools index pver_all_MISSMAFfiltered_genotypes.vcf.gz
+crun.bcftools bcftools index pver_all_ld_pruned_0.2_genotypes.vcf.gz
+```
+
+
+```bash
+#!/bin/bash
+
+# Set variables
+VCF="pver_all_MISSMAFfiltered_genotypes.vcf"
+SAMPLE1="2024_LEON_Pver_14_1"
+SAMPLE2="2024_LEON_Pver_14_2"
+OUT="discordant_sites_${SAMPLE1}_vs_${SAMPLE2}.tsv"
+
+# Extract discordant sites
+crun.bcftools bcftools gtcheck "$VCF" -p ${SAMPLE1},${SAMPLE2} -v discordant | \
+    awk '!/^#/ {print $1"\t"$2}' > discordant_positions.txt
+
+# Create region list for bcftools view
+awk '{print $1":"$2"-"$2}' discordant_positions.txt > discordant_regions.txt
+
+# Extract GT, DP, GQ for both samples at discordant sites
+crun.bcftools bcftools view -R discordant_regions.txt -s ${SAMPLE1},${SAMPLE2} -f PASS "$VCF" | \
+    crun.bcftools bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t[%SAMPLE\t%GT\t%DP\t%GQ\t]\n' > "$OUT"
+
+echo "Done. Output written to $OUT"
+```
