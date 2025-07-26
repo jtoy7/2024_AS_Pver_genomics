@@ -2864,8 +2864,21 @@ crun.plink plink \
 	--genome full \
 	--out pver_all_MISSMAF001filtered_genotypes_relatedness
 ```
+Relatedness (PI_HAT) of technical replicates is higher, but so is the relatedness of all other sample comparisons, so we still have the same issue.
 
 
+PI_HAT assumes an outbred population, but Pocillopora spp are known for high clonality and brooding of larvae, so this assumption does not hold. Instead try calculating relatedness with VCFtools.
+This method doesn't assume distributions based on HWE, but instead uses allele frequencies from your data, so is less sensitive to inbreeding.
+```bash
+#First downgrade VCF from v4.3 to v4.2 so it will work with VCFtools
+sed 's/VCFv4.3/VCFv4.2/' pver_all_MISSMAF001filtered_genotypes.vcf | crun.bcftools bgzip > pver_all_MISSMAF001filtered_genotypes_v42.vcf.gz
+
+
+module load dosage_convertor
+crun.dosage_convertor vcftools --gzvcf pver_all_MISSMAF001filtered_genotypes_v42.vcf.gz --relatedness2 --out pver_all_MISSMAF001filtered_genotypes_v42.relatedness2
+```
+
+Visualize results in R
 
 
 
