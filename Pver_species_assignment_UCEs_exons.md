@@ -183,3 +183,16 @@ crun.samtools samtools index -@ 4 ${SAMPLEOUT}_bwa_${REFBASENAME}_qsorted_dedup_
 #remove old BAM file
 rm ${SAMPLEOUT}_bwa_${REFBASENAME}_qsorted_dedup.bam
 ```
+
+Some jobs did not complete successfully because Java ran out of memory. I'm guessing this is because bwa is more memory intensive than bowtie2. To get a list of which files need to be rerun with more memory, I ran:
+```bash
+cat *.out | less | grep -B 6 "There is insufficient memory" | grep "2024_" | wc -l > ../sample_lists/mapping_rerun_list.txt
+```
+
+Then removed the existing output files for these input files so they didn't interfere with the reruns:
+```bash
+for SAMPLE in `cat $BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/mapping_rerun_list.txt`; do
+  echo $SAMPLE
+  rm $BASEDIR/pver_gwas/UCE_exon_mapping/bam/${SAMPLE}`_bwa`*
+done
+```
