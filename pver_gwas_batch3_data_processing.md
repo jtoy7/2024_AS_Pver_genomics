@@ -1768,6 +1768,18 @@ This leaves **5,255,644** SNPs
 
 <br>
 
+Can also try the following to filter based on strand bias metrics as well:
+```bash
+crun.bcftools bcftools filter --threads 36 -e 'QUAL < 30 || INFO/MQ < 40 || INFO/DP < 792 || INFO/DP > 25286 || INFO/QD < 2.0 || INFO/FS > 60.0 || INFO/SOR > 3.0' pver_all_combined_genotypes.vcf -Oz -o pver_all_QDPSBfiltered_genotypes.vcf.gz
+
+# faster way to count snps
+crun.bcftools bcftools view -H pver_all_QDPSBfiltered_genotypes.vcf.gz | wc -l
+```
+This leaves **5,082,984** SNPs
+
+
+<br>
+
 Next filter based on missingess and MAF and remove indels and multiallelic SNPs:
 ```bash
 module load plink/2024.03.02    # Note: this is PLINK2
