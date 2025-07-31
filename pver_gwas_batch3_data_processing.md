@@ -1775,7 +1775,7 @@ crun.bcftools bcftools filter --threads 36 -e 'QUAL < 30 || INFO/MQ < 40 || INFO
 # faster way to count snps
 crun.bcftools bcftools view -H pver_all_QDPSBfiltered_genotypes.vcf.gz | wc -l
 ```
-This leaves **5,082,984** SNPs
+This leaves **5,082,984** SNPs, so it removed an additional 172,660 SNPs that had indications of strand bias.
 
 
 <br>
