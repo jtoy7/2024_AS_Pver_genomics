@@ -1768,17 +1768,6 @@ This leaves **5,255,644** SNPs
 
 <br>
 
-Can also try the following to filter based on strand bias metrics as well:
-```bash
-crun.bcftools bcftools filter --threads 36 -e 'QUAL < 30 || INFO/MQ < 40 || INFO/DP < 792 || INFO/DP > 25286 || INFO/QD < 2.0 || INFO/FS > 60.0 || INFO/SOR > 3.0' pver_all_combined_genotypes.vcf -Oz -o pver_all_QDPSBfiltered_genotypes.vcf.gz
-
-# faster way to count snps
-crun.bcftools bcftools view -H pver_all_QDPSBfiltered_genotypes.vcf.gz | wc -l
-```
-This leaves **5,082,984** SNPs, so it removed an additional 172,660 SNPs that had indications of strand bias.
-
-
-<br>
 
 Next filter based on missingess and MAF and remove indels and multiallelic SNPs:
 ```bash
@@ -2891,6 +2880,26 @@ crun.dosage_convertor vcftools --gzvcf pver_all_MISSMAF001filtered_genotypes_v42
 ```
 
 Visualize results in R
+```r
+
+```
+
+
+
+Decided to try to go back and refilter the original VCF with some changes, including filtering for strand bias to remove additional false positives and saving the MAF filtering for last so there is a filtered and unfiltered version of the LD-pruned dataset.
+
+Filter original VCF based on strand bias metrics in addition to quality and depth filters:
+```bash
+crun.bcftools bcftools filter --threads 36 -e 'QUAL < 30 || INFO/MQ < 40 || INFO/DP < 792 || INFO/DP > 25286 || INFO/QD < 2.0 || INFO/FS > 60.0 || INFO/SOR > 3.0' pver_all_combined_genotypes.vcf -Oz -o pver_all_QDPSBfiltered_genotypes.vcf.gz
+
+# faster way to count snps
+crun.bcftools bcftools view -H pver_all_QDPSBfiltered_genotypes.vcf.gz | wc -l
+```
+This leaves **5,082,984** SNPs, so it removed an additional 172,660 SNPs that had indications of strand bias.
+
+<br>
+
+
 
 
 
