@@ -2881,11 +2881,51 @@ crun.dosage_convertor vcftools --gzvcf pver_all_MISSMAF001filtered_genotypes_v42
 
 Visualize results in R
 ```r
+### Try using relatedness measure from VCFtools --relatedness2 option (based on KING approach)
+# It estimates additive genetic relatedness based on allele sharing, not on assumed HWE like PLINK --genome does.
+# This method should be more accurate when there is inbreeding, because it uses actual allele frequencies from the data.
 
+relatedness2 <- read.table("pver_all_MISSMAF001filtered_genotypes_v42.relatedness2.relatedness2", header = TRUE) %>% 
+  filter(INDV1 != INDV2) %>% 
+  separate(INDV1, into = c("Year", "Location", "Species", "Genotype", "TechRep"), remove = FALSE) %>% 
+  separate(INDV2, into = c("Year2", "Location2", "Species2", "Genotype2", "TechRep2"), remove = FALSE) %>% 
+  mutate(Sample1 = paste(Year, Location, Species, Genotype, sep = "_"),
+         Sample2 = paste(Year2, Location2, Species2, Genotype2, sep = "_")) %>% 
+  rowwise() %>%
+  mutate(PairID = paste(sort(c(INDV1, INDV2)), collapse = "_")) %>%
+  ungroup() %>%
+  distinct(PairID, .keep_all = TRUE)
+   
+
+# Plot distribution of PI_HAT values
+ggplot(relatedness2, aes(x = RELATEDNESS_PHI)) +
+  geom_histogram(binwidth = 0.005, fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Pairwise RELATEDNESS_PHI Distribution", x = "RELATEDNESS_PHI", y = "Count")
+# Vast majority of comparisons have relatedness near of 0, but peak is actually negative
+
+
+# Remove the 0 values to better visualize the rest of the distribution
+ggplot(relatedness2 %>% filter(RELATEDNESS_PHI > 0), aes(x = RELATEDNESS_PHI)) +
+  geom_histogram(binwidth = 0.005, fill = "steelblue") +
+  geom_vline(xintercept = 0.48) +
+  theme_minimal() +
+  labs(title = "Pairwise RELATEDNESS_PHI Distribution (non-zero)", x = "RELATEDNESS_PHI", y = "Count")
+# Peaks around 0.25, 0.50, and 1
+
+
+techreps <- relatedness2 %>% filter(Sample1 == Sample2)
+# Comparisons between the 4 samples with technical replicates have RELATEDNESS_PHI values of > 0.491. Peak in distribution ends around 0.48.
+
+clones <- relatedness2 %>% filter(PI_HAT >= 0.48)
+# But the PI_HAT values for other comparisons are also higher. This identifies 1059 comparisons!
+
+c(clones$Sample1, clones$Sample2) %>% unique() %>% length()
+# ...corresponding to 291 unique samples!
 ```
 
 
-
+## VCF Filtering - Take 2
 Decided to try to go back and refilter the original VCF with some changes, including filtering for strand bias to remove additional false positives and saving the MAF filtering for last so there is a filtered and unfiltered version of the LD-pruned dataset.
 
 Filter original VCF based on strand bias metrics in addition to quality and depth filters:
@@ -2905,13 +2945,13 @@ This leaves **5,082,984** SNPs, so it removed an additional 172,660 SNPs that ha
 
 
 
-
-
-
-
-
-
-
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
 
 Take a closer look at quality and depth of discordant sites for a given sample comparison.
 
