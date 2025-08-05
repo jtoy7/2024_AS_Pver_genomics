@@ -415,44 +415,189 @@ $GATK --java-options "-Xmx30G" CollectAlignmentSummaryMetrics \
 -O ${SAMPLEOUT}_bwa_${REFBASENAME}_qsorted_dedup_coordsorted.bam_alignment_metrics.txt
 ```
 
+
 Parse alignment metrics for each file into a summary table:
 `parse_CollectAlignmentSummaryMetrics_output.sh`
 ```bash
+#!/bin/bash
 
+METRICS_DIR=/archive/barshis/barshislab/jtoy/pver_gwas/UCE_exon_mapping/bam
+OUTPUT_FILE="$METRICS_DIR"/alignment_summary_metrics_combined.tsv
+
+> "$OUTPUT_FILE"
+
+header_written=0
+
+for METRIC_FILE in `ls "$METRICS_DIR"/*_alignment_metrics.txt`; do
+    SAMPLE_ID=$(basename "$METRIC_FILE" | cut -d'_' -f1-8)
+
+    if [[ $header_written -eq 0 ]]; then
+        HEADER_LINE=$(head -n 7 "$METRIC_FILE" | tail -n 1)
+        echo -e "SAMPLE\t$HEADER_LINE" >> "$OUTPUT_FILE"
+        header_written=1
+    fi
+
+    METRIC_LINES=$(head -n 10 "$METRIC_FILE" | tail -n 3)
+
+    while IFS= read -r line; do
+        echo -e "$SAMPLE_ID\t$line" >> "$OUTPUT_FILE"
+    done <<< "$METRIC_LINES"
+done
+
+echo "Combined metrics saved to $OUTPUT_FILE"
 ```
+The following files had no alignments, so they only output one CATEGORY = "UNPAIRED" line per file:
+2024_AOAA_Pver_03_1_A_R24193_L005_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam_alignment_metrics.txt
+2024_AOAA_Pver_03_1_A_R24196_L003_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam_alignment_metrics.txt
+2024_AOAA_Pver_03_1_A_R24196_L004_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam_alignment_metrics.txt
+
+This is why the `alignment_summary_metrics_combined.tsv` file is 6 lines shorter than expected.
+
+<br>
 
 Check duplicate rate of each library:
 `summarize_dedup.sh`
 ```bash
+#!/bin/bash
 
+# Create output file
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam
+OUTFILE=$BAMDIR/dupstat_summary.tsv
+
+
+# Change working directory
+cd $BAMDIR
+
+# Print header
+echo -e "FILE\tLIBRARY\tUNPAIRED_READS_EXAMINED\tREAD_PAIRS_EXAMINED\tSECONDARY_OR_SUPPLEMENTARY_RDS\tUNMAPPED_READS\tUNPAIRED_READ_DUPLICATES\tREAD_PAIR_DUPLICATES\tREAD_PAIR_OPTICAL_DUPLICATES\tPERCENT_DUPLICATION\tESTIMATED_LIBRARY_SIZE" > $OUTFILE
+
+# Loop through all dupstat files
+for FILE in `ls *dupstat.txt`; do
+    # Extract the second line after the "## METRICS CLASS" line (i.e., the actual data)
+    DATA=$(awk '/^## METRICS CLASS/ {getline; getline; print}' "$FILE")
+
+    # Print data to outfile
+    echo -e "$FILE\t$DATA" >> $OUTFILE
+
+done
 ```
+
+```bash
+```
+```
+FILE    LIBRARY READ_PAIRS_EXAMINED     PERCENT_DUPLICATION
+2024_VATI_Pver_33_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_331A     1436337 0.744334
+2024_VATI_Pver_36_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_361A     1581278 0.743764
+2024_VATI_Pver_35_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_351A     1609489 0.70955
+2024_VATI_Pver_30_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_301A     3409757 0.703349
+2024_VATI_Pver_25_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_251A     3759393 0.692728
+2024_VATI_Pver_22_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_221A     5224472 0.690568
+2024_VATI_Pver_34_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_341A     5181677 0.688023
+2024_VATI_Pver_24_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_241A     4882890 0.687029
+2024_VATI_Pver_27_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_271A     3400378 0.686897
+2024_VATI_Pver_26_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_261A     3157198 0.686232
+2024_VATI_Pver_29_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_291A     5377729 0.683454
+2024_VATI_Pver_32_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_321A     5650777 0.681824
+2024_FTEL_Pver_14_1_B_R24196_L006_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_FTEL_Pver_141B     190639  0.666475
+2024_VATI_Pver_28_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_281A     4158454 0.664436
+2024_VATI_Pver_31_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_311A     5404326 0.653372
+2024_VATI_Pver_23_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_231A     5567926 0.650706
+2024_VATI_Pver_21_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_211A     6100682 0.649143
+2024_OFU3_Pver_24_1_A_R24196_L002_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_241A     0       0.642857
+2024_FTEL_Pver_14_1_B_R24196_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_FTEL_Pver_141B     189575  0.641471
+2024_FTEL_Pver_14_1_B_R24196_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_FTEL_Pver_141B     189670  0.639482
+...
+2024_LEON_Ahya_21_1_B_R24196_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Ahya_211B     123537  0.235735
+2024_LEON_Ahya_21_1_B_R24193_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Ahya_211B     121930  0.233313
+2024_LEON_Ahya_21_1_B_R24196_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Ahya_211B     122547  0.233155
+2024_LEON_Ahya_21_1_B_R24193_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Ahya_211B     120430  0.232021
+2024_VATI_Pver_17_1_B_R24196_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_171B     355460  0.231093
+2024_VATI_Pver_17_1_B_R24193_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_171B     347255  0.228347
+2024_VATI_Pver_17_1_B_R24196_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_171B     354720  0.227863
+2024_VATI_Pver_17_1_B_R24193_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_171B     353858  0.226652
+2024_FMAL_Pspp_Extra1_1_A_R24196_L003_bwa_UCEexon2068ref_qsorted_dupstat.txt    2024_FMAL_Pspp_Extra11A 76      0.22488
+2024_VATI_Pver_17_1_B_R24196_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_VATI_Pver_171B     348098  0.22313
+2024_OFU3_Pver_12_1_A_R24196_L002_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_121A     85      0.221538
+2024_OFU3_Pver_12_1_A_R24193_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_121A     114     0.21875
+2024_FMAL_Pspp_Extra1_1_A_R24196_L004_bwa_UCEexon2068ref_qsorted_dupstat.txt    2024_FMAL_Pspp_Extra11A 82      0.218605
+2024_FMAL_Pspp_Extra1_1_A_R24196_L001_bwa_UCEexon2068ref_qsorted_dupstat.txt    2024_FMAL_Pspp_Extra11A 74      0.207373
+2024_OFU3_Pver_16_1_A_R24196_L001_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_161A     1       0.2
+2024_FMAL_Pspp_Extra1_1_A_R24196_L002_bwa_UCEexon2068ref_qsorted_dupstat.txt    2024_FMAL_Pspp_Extra11A 79      0.186364
+2024_LEON_Pver_03_1_B_R24196_L006_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_031B     97065   0.178101
+2024_FMAL_Pspp_Extra1_1_A_R24193_L006_bwa_UCEexon2068ref_qsorted_dupstat.txt    2024_FMAL_Pspp_Extra11A 75      0.177419
+2024_LEON_Pver_03_1_B_R24196_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_031B     97983   0.165869
+2024_LEON_Pver_03_1_B_R24196_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_031B     98746   0.164037
+2024_FMAL_Pspp_Extra1_1_A_R24193_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt    2024_FMAL_Pspp_Extra11A 66      0.163366
+2024_LEON_Pver_03_1_B_R24193_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_031B     99020   0.161474
+2024_LEON_Pver_03_1_B_R24196_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_031B     97216   0.160803
+2024_LEON_Pver_03_1_B_R24193_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_031B     95774   0.158918
+2024_OFU3_Pver_27_1_A_R24196_L001_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_271A     1       0.142857
+2024_OFU3_Pver_24_1_A_R24196_L001_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_241A     1       0.142857
+2024_OFU3_Pver_16_1_A_R24193_L006_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_161A     2       0.111111
+2024_OFU3_Pver_16_1_A_R24196_L004_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_161A     2       0
+2024_OFU3_Pver_16_1_A_R24196_L002_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_161A     2       0
+2024_OFU3_Pver_14_1_A_R24196_L004_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_141A     0       0
+2024_OFU3_Pver_14_1_A_R24196_L003_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_141A     1       0
+2024_OFU3_Pver_14_1_A_R24196_L002_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_141A     0       0
+2024_OFU3_Pver_14_1_A_R24196_L001_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_141A     0       0
+2024_OFU3_Pver_14_1_A_R24193_L006_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_141A     0       0
+2024_OFU3_Pver_14_1_A_R24193_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_OFU3_Pver_141A     0       0
+2024_LEON_Pver_11_1_B_R24196_L006_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_111B     0       0
+2024_LEON_Pver_11_1_B_R24196_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_111B     0       0
+2024_LEON_Pver_11_1_B_R24193_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_111B     0       0
+2024_LEON_Pver_11_1_B_R24193_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Pver_111B     0       0
+2024_LEON_Ahya_21_1_A_R24196_L003_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Ahya_211A     1       0
+2024_LEON_Ahya_21_1_A_R24193_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_LEON_Ahya_211A     0       0
+2024_AOAA_Pver_03_1_B_R24196_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031B     0       0
+2024_AOAA_Pver_03_1_B_R24196_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031B     0       0
+2024_AOAA_Pver_03_1_B_R24196_L006_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031B     0       0
+2024_AOAA_Pver_03_1_B_R24196_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031B     1       0
+2024_AOAA_Pver_03_1_B_R24193_L008_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031B     0       0
+2024_AOAA_Pver_03_1_B_R24193_L007_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031B     0       0
+2024_AOAA_Pver_03_1_A_R24196_L004_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031A     0       0
+2024_AOAA_Pver_03_1_A_R24196_L003_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031A     0       0
+2024_AOAA_Pver_03_1_A_R24196_L002_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031A     0       0
+2024_AOAA_Pver_03_1_A_R24196_L001_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031A     0       0
+2024_AOAA_Pver_03_1_A_R24193_L006_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031A     0       0
+2024_AOAA_Pver_03_1_A_R24193_L005_bwa_UCEexon2068ref_qsorted_dupstat.txt        2024_AOAA_Pver_031A     0       0
+```
+Most files have pretty high duplication rate around 40-60%, which is higher than for the hologenome mapping. I guess this is because there are fewer regions to map to with this reference, so reads can map to the same regions more easily?
+
+<br>
 
 Move Ahya bams into a separate directory:
 ```bash
 mkdir Ahya_bams
 mv *Ahya*.bam Ahya_bams
 ```
+36 files moved.
+
+<br>
 
 Move Batch 1 bams into a separate directory (they have one file each so don't need to be merged):
 ```bash
 mkdir batch1_bams
-mv 2024_VATI_Pver_21_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_22_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_23_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_24_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_25_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_26_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_27_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_28_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_29_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_30_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_31_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_32_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_33_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_34_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_35_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
-mv 2024_VATI_Pver_36_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams
+mv 2024_VATI_Pver_21_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_22_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_23_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_24_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_25_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_26_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_27_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_28_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_29_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_30_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_31_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_32_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_33_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_34_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_35_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
+mv 2024_VATI_Pver_36_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam batch1_bams/
 ```
+16 files moved.
+
+<br>
 
 ### Merge bams from same extraction
 Run script `merge_bams_by_sample_array.slurm` to merge bams from data batches 2 and 3 (4 + 8 = 12 lanes per library) by sample:
