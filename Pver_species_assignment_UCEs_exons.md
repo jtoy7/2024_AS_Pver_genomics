@@ -356,6 +356,9 @@ rm ${SAMPLEOUT}_bwa_${REFBASENAME}_qsorted_dedup.bam
 
 <br>
 
+
+### Summarize alignment metrics
+
 Run CollectAlignmentSummaryMetrics from picard to get mapping summary for each file.
 `CollectAlignmentSummaryMetrics_array.slurm`:
 ```bash
@@ -413,3 +416,89 @@ $GATK --java-options "-Xmx30G" CollectAlignmentSummaryMetrics \
 ```
 
 Parse alignment metrics for each file into a summary table:
+`parse_CollectAlignmentSummaryMetrics_output.sh`
+```bash
+
+```
+
+Check duplicate rate of each library:
+`summarize_dedup.sh`
+```bash
+
+```
+
+Remove Ahya bams into a separate directory:
+```bash
+mkdir Ahya_bams
+mv *Ahya*.bam Ahya_bams
+```
+
+### Merge bams from same extraction
+Run script `merge_bams_by_sample_array.slurm` to merge bams from data batches 2 and 3 (4 + 8 = 12 lanes per library) by sample:
+```bash
+#!/bin/bash
+
+#SBATCH --job-name=merge_bams_by_sample_2025-08-05
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-397%42
+#SBATCH --ntasks=1
+#SBATCH --mem=30G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=6
+
+## Load modules
+module load container_env samtools
+
+## Define some variables
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam
+OUTDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams
+SAMPLELIST=($(ls $BAMDIR/*P*.bam | sed -E 's/.*\/2024_([A-Z]{3}._P[a-z]{3}_[0-9A-Za-z]+_[12])_.*/\1/' | sort | uniq))
+REFBASENAME=UCEexon2068ref
+
+
+# Create output directory if it doesn't exist
+mkdir -p "$OUTDIR"
+
+
+# Get the sample name for current array task
+SAMPLE="${SAMPLELIST[$SLURM_ARRAY_TASK_ID-1]}"
+
+# Keep record of sample file
+echo $SAMPLE
+
+# List the BAM files for the current sample
+BAMFILES=$(ls $BAMDIR/'2024_'$SAMPLE'_'*'.bam')
+
+# Keep record of BAM files
+echo $BAMFILES
+
+# Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+# Define the output merged BAM file name
+MERGEDBAM=$OUTDIR/'2024_'$SAMPLE'_'$REFBASENAME'_merged.bam'
+
+
+# Merge the BAM files for the sample
+echo "Merging BAM files for $SAMPLE into $MERGEDBAM..."
+crun.samtools samtools merge -f -@ 6 "$MERGEDBAM" $BAMFILES
+
+
+echo "Merging complete for $SAMPLE!"
+```
+
+```bash
+sbatch merge_bams_by_sample_array.slurm
+```
+
+### Make list of merged bam files
+```bash
+cd $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams
+
+ls *merged.bam > ../sample_lists/merged_bams_list.txt
+```
