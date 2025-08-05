@@ -1162,7 +1162,9 @@ Compile counts
 echo -e "Sample\tPver_mapped_read_count" > pver_mapped_read_counts.txt
 cat *pvercount.txt >> pver_mapped_read_counts.txt
 ```
+
  <br>
+
 ```bash
 sort -V -k2,2 pver_mapped_read_counts.txt | less
 ```
