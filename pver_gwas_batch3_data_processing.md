@@ -3154,7 +3154,8 @@ ggplot() +
        title = "LD Decay Curve - Pver") +
   theme_minimal(base_size = 14)
 ```
-The plot is very similar to the original SNP set without the strand bias filtering, with maybe slightly less linkage in general. **LD still declines well below 0.2 by 10 kb**, so I will still use that as my window size for pruning.
+![alt text](image.png)
+The plot is very similar to the original SNP set without the strand bias filtering, with maybe slightly less linkage in general (red is new SNP set, blue is original SNP set). **LD still declines well below 0.2 by 10 kb**, so I will still use that as my window size for pruning.
 
 <br>
 
