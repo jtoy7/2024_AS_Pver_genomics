@@ -3180,23 +3180,18 @@ crun.plink plink2 \
 ```
 **76,737** SNPs retained.
 
-
-
-
-
-
-
+<br>
 
 Lenient pruning (pruning SNP pairs with r2 > 0.5; balancing redundancy minimization with signal retention):
 ```bash
 crun.plink plink2 \
-  --pgen pver_all_MISSMAFfiltered_uniqIDs.pgen \
-  --psam pver_all_MISSMAFfiltered_uniqIDs.psam \
-  --pvar pver_all_MISSMAFfiltered_uniqIDs.pvar \
+  --pgen pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pgen \
+  --psam pver_all_QDPSB_MISSMAF05filtered_uniqIDs.psam \
+  --pvar pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pvar \
   --indep-pairwise 10kb 1 0.5 \
-  --out pver_all_MISSMAFfiltered_ld_0.5
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_0.5
 ```
-**189,630** SNPs retained
+**184,135** SNPs retained
 
 `indep-pairwise` parameters used:
 - `10kb` → window size in kb (can also be specified in number of SNPs by omitting "kb" suffix)
@@ -3208,32 +3203,32 @@ I used r2 > 0.2 to conservatively remove linked SNPs for population structure an
 ### Filter dataset using pruned SNP list (stringent)
 ```bash
 crun.plink plink2 \
-  --pgen pver_all_MISSMAFfiltered_uniqIDs.pgen \
-  --pvar pver_all_MISSMAFfiltered_uniqIDs.pvar \
-  --psam pver_all_MISSMAFfiltered_uniqIDs.psam \
-  --extract pver_all_MISSMAFfiltered_ld_0.2.prune.in \
+  --pgen pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pgen \
+  --psam pver_all_QDPSB_MISSMAF05filtered_uniqIDs.psam \
+  --pvar pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pvar \
+  --extract pver_all_QDPSB_MISSMAF05filtered_ld_0.2.prune.in \
   --make-pgen \
-  --out pver_all_ld_pruned_0.2_genotypes
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes
 ```
 
 Convert to VCF for viewing/downstream use:
 ```bash
 crun.plink plink2 \
-  --pgen pver_all_ld_pruned_0.2_genotypes.pgen \
-  --psam pver_all_ld_pruned_0.2_genotypes.psam \
-  --pvar pver_all_ld_pruned_0.2_genotypes.pvar \
+  --pgen pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.pgen \
+  --psam pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.psam \
+  --pvar pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.pvar \
   --recode vcf \
-  --out pver_all_ld_pruned_0.2_genotypes
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes
 ```
 
 Double-check number of SNPs in VCF:
 ```bash
-grep -v "^#" pver_all_ld_pruned_0.2_genotypes.vcf | wc -l
+grep -v "^#" pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.vcf | wc -l
 ```
 ```
-80208
+76737
 ```
-
+This is 3,471 fewer than the non SB-filtered pruned data set.
 
 
 
