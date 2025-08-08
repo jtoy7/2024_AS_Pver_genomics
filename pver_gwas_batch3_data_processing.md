@@ -2941,6 +2941,306 @@ This leaves **5,082,984** SNPs, so it removed an additional 172,660 SNPs that ha
 
 <br>
 
+Now let's filter based on missingess and remove indels and multiallelic SNPs, without a MAF filter:
+```bash
+crun.plink plink2 \
+  --vcf pver_all_QDPSBfiltered_genotypes.vcf.gz \
+  --snps-only just-acgt \
+  --max-alleles 2 \
+  --geno 0.2 \
+  --mind 0.2 \
+  --make-pgen \
+  --out pver_all_QDPSB_MISSfiltered_genotypes
+```
+```
+...
+0 samples removed due to missing genotype data (--mind).
+396 samples (0 females, 0 males, 396 ambiguous; 396 founders) remaining after main filters.
+Calculating allele frequencies... done.
+--geno: 7 variants removed due to missing genotype data.
+4493140 variants remaining after main filters.
+```
+
+
+Then try using a very low MAF filter (0.001):
+```bash
+module load plink/2024.03.02    # Note: this is PLINK2
+
+crun.plink plink2 \
+  --vcf pver_all_QDPSBfiltered_genotypes.vcf.gz \
+  --snps-only just-acgt \
+  --max-alleles 2 \
+  --geno 0.2 \
+  --mind 0.2 \
+  --maf 0.001 \
+  --make-pgen \
+  --out pver_all_QDPSB_MISSMAF001filtered_genotypes
+```
+```
+...
+0 samples removed due to missing genotype data (--mind).
+396 samples (0 females, 0 males, 396 ambiguous; 396 founders) remaining after main filters.
+Calculating allele frequencies... done.
+--geno: 7 variants removed due to missing genotype data.
+42946 variants removed due to allele frequency threshold(s) (--maf/--max-maf/--mac/--max-mac).
+4450194 variants remaining after main filters.
+```
+The MAF 0.001 filter only removes 42,946 SNPs, so I will continue with this set for LD pruning and recalculating PI_HAT
+
+Convert to VCF for viewing:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF001filtered_genotypes.pgen \
+  --psam pver_all_QDPSB_MISSMAF001filtered_genotypes.psam \
+  --pvar pver_all_QDPSB_MISSMAF001filtered_genotypes.pvar \
+  --recode vcf \
+  --out pver_all_QDPSB_MISSMAF001filtered_genotypes
+```
+This vcf has **4,450,194** SNPs remaining.
+
+<br>
+
+Then finally, a more strict MAF filter of 0.05 (for PCA and ADMIXTURE)
+```bash
+crun.plink plink2 \
+  --vcf pver_all_QDPSBfiltered_genotypes.vcf.gz \
+  --snps-only just-acgt \
+  --max-alleles 2 \
+  --geno 0.2 \
+  --mind 0.2 \
+  --maf 0.05 \
+  --make-pgen \
+  --out pver_all_QDPSB_MISSMAF05filtered_genotypes
+```
+```
+...
+0 samples removed due to missing genotype data (--mind).
+396 samples (0 females, 0 males, 396 ambiguous; 396 founders) remaining after main filters.
+Calculating allele frequencies... done.
+--geno: 7 variants removed due to missing genotype data.
+3370867 variants removed due to allele frequency threshold(s) (--maf/--max-maf/--mac/--max-mac).
+1122273 variants remaining after main filters.
+```
+
+Convert to VCF for viewing:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF05filtered_genotypes.pgen \
+  --psam pver_all_QDPSB_MISSMAF05filtered_genotypes.psam \
+  --pvar pver_all_QDPSB_MISSMAF05filtered_genotypes.pvar \
+  --recode vcf \
+  --out pver_all_QDPSB_MISSMAF05filtered_genotypes
+```
+This vcf has **1,122,273** SNPs remaining.
+
+<br>
+
+### LD pruning
+PLINK2 requires unique values in the ID field for each SNP. Our dataset does not contain any ID values, but instead has "." placeholders. So the first thing we need to do is replace these with a chromosome/position-based ID:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF05filtered_genotypes.pgen \
+  --psam pver_all_QDPSB_MISSMAF05filtered_genotypes.psam \
+  --pvar pver_all_QDPSB_MISSMAF05filtered_genotypes.pvar \
+  --set-all-var-ids @:#:\$r:\$a \
+  --make-pgen \
+  --out pver_all_QDPSB_MISSMAF05filtered_uniqIDs
+
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF001filtered_genotypes.pgen \
+  --psam pver_all_QDPSB_MISSMAF001filtered_genotypes.psam \
+  --pvar pver_all_QDPSB_MISSMAF001filtered_genotypes.pvar \
+  --set-all-var-ids @:#:\$r:\$a \
+  --make-pgen \
+  --out pver_all_QDPSB_MISSMAF001filtered_uniqIDs
+```
+The `@:#:$r:$a` syntax creates IDs formatted as `CHROM:POS:REF:ALT`.
+
+<br>
+
+### Investigate rate of LD decay
+Compute pairwise-LD (r2) values:
+```
+crun.plink plink2 \
+  --pfile pver_all_QDPSB_MISSMAF05filtered_genotypes \
+  --thin-count 100000 \
+  --r2-unphased \
+  --ld-window-kb 1000 \
+  --ld-window-r2 0 \
+  --threads 30 \
+  --out ld_decay_QDPSB_MISSMAF05
+```
+
+Plot LD decay in R:
+`plot_ld_decay.R`
+```r
+# Plot LD decay - Pver all samples
+# 2025-07-02
+# Jason A. Toy
+
+
+rm(list = ls())
+
+
+library(tidyverse)
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf")
+
+
+### First look at variant set that did not use strand bias filters and had a MAF filter of 0.05
+
+# Import LD values
+library(data.table) # for faster import of large datasets
+ld <- fread("ld_decay.vcor") %>% mutate(DIST_BP = abs(POS_B - POS_A))
+
+
+# Bin distances and summarize r2 by bin
+bin_size <- 1000  # define distance bins in bp
+
+ld_summary <- ld %>%
+  mutate(DIST_BIN = floor(DIST_BP / bin_size) * bin_size) %>%
+  group_by(DIST_BIN) %>%
+  summarise(mean_r2 = mean(UNPHASED_R2, na.rm = TRUE), n_pairs = n(), .groups = "drop")
+
+
+# Plot LD decay
+ldplot <- ggplot(ld_summary, aes(x = DIST_BIN/1000, y = mean_r2)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(size = 0.5, alpha = 0.6) +
+  labs(x = "Distance between SNPs (kb)", y = expression(paste("Mean ", r^2)),
+       title = "LD Decay Curve - Pver") +
+  theme_minimal(base_size = 14)
+
+ggsave(ldplot, file = "ld_decay_plot.pdf")
+
+
+
+
+### Redo for variant set with strand bias filter and MAF filter of 0.05
+
+# Import LD values
+library(data.table) # for faster import of large datasets
+ld_SBMAF05 <- fread("ld_decay_QDPSB_MISSMAF05.vcor") %>% mutate(DIST_BP = abs(POS_B - POS_A))
+
+
+# Bin distances and summarize r2 by bin
+bin_size <- 1000  # define distance bins in bp
+
+ld_SBMAF05_summary <- ld_SBMAF05 %>%
+  mutate(DIST_BIN = floor(DIST_BP / bin_size) * bin_size) %>%
+  group_by(DIST_BIN) %>%
+  summarise(mean_r2 = mean(UNPHASED_R2, na.rm = TRUE), n_pairs = n(), .groups = "drop")
+
+
+# Plot LD decay
+ldplot_SBMAF05 <- ggplot(ld_SBMAF05_summary, aes(x = DIST_BIN/1000, y = mean_r2)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(size = 0.5, alpha = 0.6) +
+  labs(x = "Distance between SNPs (kb)", y = expression(paste("Mean ", r^2)),
+       title = "LD Decay Curve - Pver") +
+  theme_minimal(base_size = 14)
+
+ggsave(ldplot_SBMAF05, file = "ld_decay_QDPSB_MISSMAF05_plot.pdf")
+
+
+
+
+### Plot LD decay for both variant sets simultaneously
+ggplot() +
+  geom_line(data = ld_summary, aes(x = DIST_BIN/1000, y = mean_r2), color = "steelblue", linewidth = 1) +
+  geom_point(data = ld_summary, aes(x = DIST_BIN/1000, y = mean_r2), size = 0.5, alpha = 0.6) +
+  geom_line(data = ld_SBMAF05_summary, aes(x = DIST_BIN/1000, y = mean_r2), color = "firebrick", linewidth = 1) +
+  geom_point(data = ld_SBMAF05_summary, aes(x = DIST_BIN/1000, y = mean_r2), size = 0.5, alpha = 0.6) +
+  labs(x = "Distance between SNPs (kb)", y = expression(paste("Mean ", r^2)),
+       title = "LD Decay Curve - Pver") +
+  theme_minimal(base_size = 14)
+```
+The plot is very similar to the original SNP set without the strand bias filtering, with maybe slightly less linkage in general. **LD still declines well below 0.2 by 10 kb**, so I will still use that as my window size for pruning.
+
+<br>
+
+
+Now run pruning. Output is an LD-pruned list of SNPs. I ran this twice with different r2 values for comparison:
+
+Stringent pruning for PCA, ADMIXTURE, etc (pruning SNP pairs with r2 > 0.2):
+```bash
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pgen \
+  --psam pver_all_QDPSB_MISSMAF05filtered_uniqIDs.psam \
+  --pvar pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pvar \
+  --indep-pairwise 10kb 1 0.2 \
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_0.2
+
+# Also run for MAF>0.001 SNP set 
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF001filtered_uniqIDs.pgen \
+  --psam pver_all_QDPSB_MISSMAF001filtered_uniqIDs.psam \
+  --pvar pver_all_QDPSB_MISSMAF001filtered_uniqIDs.pvar \
+  --indep-pairwise 10kb 1 0.2 \
+  --out pver_all_QDPSB_MISSMAF001filtered_ld_0.2
+```
+**76,737** SNPs retained.
+
+
+
+
+
+
+
+
+Lenient pruning (pruning SNP pairs with r2 > 0.5; balancing redundancy minimization with signal retention):
+```bash
+crun.plink plink2 \
+  --pgen pver_all_MISSMAFfiltered_uniqIDs.pgen \
+  --psam pver_all_MISSMAFfiltered_uniqIDs.psam \
+  --pvar pver_all_MISSMAFfiltered_uniqIDs.pvar \
+  --indep-pairwise 10kb 1 0.5 \
+  --out pver_all_MISSMAFfiltered_ld_0.5
+```
+**189,630** SNPs retained
+
+`indep-pairwise` parameters used:
+- `10kb` → window size in kb (can also be specified in number of SNPs by omitting "kb" suffix)
+- `1` → step size (how many SNPs to shift the window each time; must be 1 bp when specifying window size in kb)
+- `0.2` → r² threshold (SNPs with pairwise r² > 0.2 are considered linked)
+
+I used r2 > 0.2 to conservatively remove linked SNPs for population structure analysis, but the more lenient SNP set (r2 > 0.5) may be useful for other downstream analyses.
+
+### Filter dataset using pruned SNP list (stringent)
+```bash
+crun.plink plink2 \
+  --pgen pver_all_MISSMAFfiltered_uniqIDs.pgen \
+  --pvar pver_all_MISSMAFfiltered_uniqIDs.pvar \
+  --psam pver_all_MISSMAFfiltered_uniqIDs.psam \
+  --extract pver_all_MISSMAFfiltered_ld_0.2.prune.in \
+  --make-pgen \
+  --out pver_all_ld_pruned_0.2_genotypes
+```
+
+Convert to VCF for viewing/downstream use:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_ld_pruned_0.2_genotypes.pgen \
+  --psam pver_all_ld_pruned_0.2_genotypes.psam \
+  --pvar pver_all_ld_pruned_0.2_genotypes.pvar \
+  --recode vcf \
+  --out pver_all_ld_pruned_0.2_genotypes
+```
+
+Double-check number of SNPs in VCF:
+```bash
+grep -v "^#" pver_all_ld_pruned_0.2_genotypes.vcf | wc -l
+```
+```
+80208
+```
+
+
+
+
+
+
+
+
 
 
 
