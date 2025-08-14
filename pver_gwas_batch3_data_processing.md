@@ -2962,7 +2962,7 @@ Calculating allele frequencies... done.
 ```
 
 
-Then try using a very low MAF filter (0.001):
+Then try using a very low MAF filter (0.002):
 ```bash
 module load plink/2024.03.02    # Note: this is PLINK2
 
@@ -2972,9 +2972,9 @@ crun.plink plink2 \
   --max-alleles 2 \
   --geno 0.2 \
   --mind 0.2 \
-  --maf 0.001 \
+  --maf 0.002 \
   --make-pgen \
-  --out pver_all_QDPSB_MISSMAF001filtered_genotypes
+  --out pver_all_QDPSB_MISSMAF002filtered_genotypes
 ```
 ```
 ...
@@ -2982,10 +2982,10 @@ crun.plink plink2 \
 396 samples (0 females, 0 males, 396 ambiguous; 396 founders) remaining after main filters.
 Calculating allele frequencies... done.
 --geno: 7 variants removed due to missing genotype data.
-42946 variants removed due to allele frequency threshold(s) (--maf/--max-maf/--mac/--max-mac).
-4450194 variants remaining after main filters.
+1525563 variants removed due to allele frequency threshold(s) (--maf/--max-maf/--mac/--max-mac).
+2967577 variants remaining after main filters.
 ```
-The MAF 0.001 filter only removes 42,946 SNPs, so I will continue with this set for LD pruning and recalculating PI_HAT
+The MAF 0.002 filter removes 1,525,563 SNPs, so there were many low-frequency alleles.
 
 Convert to VCF for viewing:
 ```bash
@@ -3059,6 +3059,9 @@ The `@:#:$r:$a` syntax creates IDs formatted as `CHROM:POS:REF:ALT`.
 <br>
 
 ### Investigate rate of LD decay
+Note that to accurately estimate LD, the MAF>0.05 filtered SNP set must be used, because low MAF SNPs can bias the estimation. Low-frequency variants appear more randomly across individuals. They are often young and restricted to small subsets of a population, so they don’t reflect broader population-level LD patterns. It is standard practice to MAF-filter before estimating LD.
+
+
 Compute pairwise-LD (r2) values:
 ```
 crun.plink plink2 \
@@ -3164,6 +3167,7 @@ Now run pruning. Output is an LD-pruned list of SNPs. I ran this twice with diff
 
 Stringent pruning for PCA, ADMIXTURE, etc (pruning SNP pairs with r2 > 0.2):
 ```bash
+# For MAF>0.05 SNP set 
 crun.plink plink2 \
   --pgen pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pgen \
   --psam pver_all_QDPSB_MISSMAF05filtered_uniqIDs.psam \
@@ -3171,7 +3175,7 @@ crun.plink plink2 \
   --indep-pairwise 10kb 1 0.2 \
   --out pver_all_QDPSB_MISSMAF05filtered_ld_0.2
 
-# Also run for MAF>0.001 SNP set 
+# For MAF>0.001 SNP set 
 crun.plink plink2 \
   --pgen pver_all_QDPSB_MISSMAF001filtered_uniqIDs.pgen \
   --psam pver_all_QDPSB_MISSMAF001filtered_uniqIDs.psam \
@@ -3179,20 +3183,36 @@ crun.plink plink2 \
   --indep-pairwise 10kb 1 0.2 \
   --out pver_all_QDPSB_MISSMAF001filtered_ld_0.2
 ```
-**76,737** SNPs retained.
+**76,737** SNPs retained for MAF>0.05 SNP set.
+
+**362,424** SNPs retained for MAF>0.001 SNP set.
 
 <br>
 
 Lenient pruning (pruning SNP pairs with r2 > 0.5; balancing redundancy minimization with signal retention):
 ```bash
+# For MAF>0.05 SNP set 
 crun.plink plink2 \
   --pgen pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pgen \
   --psam pver_all_QDPSB_MISSMAF05filtered_uniqIDs.psam \
   --pvar pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pvar \
   --indep-pairwise 10kb 1 0.5 \
   --out pver_all_QDPSB_MISSMAF05filtered_ld_0.5
+
+# For MAF>0.001 SNP set 
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF001filtered_uniqIDs.pgen \
+  --psam pver_all_QDPSB_MISSMAF001filtered_uniqIDs.psam \
+  --pvar pver_all_QDPSB_MISSMAF001filtered_uniqIDs.pvar \
+  --indep-pairwise 10kb 1 0.5 \
+  --out pver_all_QDPSB_MISSMAF001filtered_ld_0.5
 ```
-**184,135** SNPs retained
+**184,135** SNPs retained for MAF>0.05 SNP set
+
+**708,411** SNPs retained for MAF>0.001 SNP set
+
+<br>
+<br>
 
 `indep-pairwise` parameters used:
 - `10kb` → window size in kb (can also be specified in number of SNPs by omitting "kb" suffix)
@@ -3203,6 +3223,7 @@ I used r2 > 0.2 to conservatively remove linked SNPs for population structure an
 
 ### Filter dataset using pruned SNP list (stringent)
 ```bash
+# For MAF>0.05 SNP set 
 crun.plink plink2 \
   --pgen pver_all_QDPSB_MISSMAF05filtered_uniqIDs.pgen \
   --psam pver_all_QDPSB_MISSMAF05filtered_uniqIDs.psam \
@@ -3210,16 +3231,34 @@ crun.plink plink2 \
   --extract pver_all_QDPSB_MISSMAF05filtered_ld_0.2.prune.in \
   --make-pgen \
   --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes
+
+# For MAF>0.001 SNP set 
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF001filtered_uniqIDs.pgen \
+  --psam pver_all_QDPSB_MISSMAF001filtered_uniqIDs.psam \
+  --pvar pver_all_QDPSB_MISSMAF001filtered_uniqIDs.pvar \
+  --extract pver_all_QDPSB_MISSMAF001filtered_ld_0.2.prune.in \
+  --make-pgen \
+  --out pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes
 ```
 
 Convert to VCF for viewing/downstream use:
 ```bash
+# For MAF>0.05 SNP set 
 crun.plink plink2 \
   --pgen pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.pgen \
   --psam pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.psam \
   --pvar pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.pvar \
   --recode vcf \
   --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes
+
+# For MAF>0.001 SNP set 
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes.pgen \
+  --psam pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes.psam \
+  --pvar pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes.pvar \
+  --recode vcf \
+  --out pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes
 ```
 
 Double-check number of SNPs in VCF:
@@ -3231,13 +3270,68 @@ grep -v "^#" pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.vcf | wc -
 ```
 This is 3,471 fewer than the non SB-filtered pruned data set.
 
+```bash
+grep -Pv "^#" pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes.vcf | wc -l
+```
+```
+362424
+```
+
+<br>
+
+### Calculate IBD (PI_HAT) with MAF>0.001 filtered, pruned (r<0.2) dataset
+Calculate proportion identity-by-descent (PI_HAT) with PLINK1 using --genome flag:
+
+```bash
+## Convert to PLINK1.9 format
+# For MAF>0.001 SNP set 
+crun.plink plink2 \
+  --pfile pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes \
+  --make-bed \
+  --out pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes
+
+# For MAF>0.05 SNP set 
+crun.plink plink2 \
+  --pfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
+  --make-bed \
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes
 
 
+# load PLINK v1.9
+module load plink/1.9-20240319
 
 
+# calculate IBD (PI_HAT)
+# For MAF>0.001 SNP set 
+crun.plink plink \
+	--bfile pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes\
+	--allow-extra-chr \
+	--genome \
+	--out pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_relatedness
+
+# For MAF>0.05 SNP set 
+crun.plink plink \
+	--bfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes\
+	--allow-extra-chr \
+	--genome \
+	--out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_relatedness
+```
+
+### Calculate relatedness with VCFtools (more robust to inbreeding)
+```bash
+#First downgrade VCF from v4.3 to v4.2 so it will work with VCFtools
+sed 's/VCFv4.3/VCFv4.2/' pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes.vcf | crun.bcftools bgzip > pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes_v42.vcf.gz
+
+sed 's/VCFv4.3/VCFv4.2/' pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.vcf | crun.bcftools bgzip > pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_v42.vcf.gz
 
 
+module load dosage_convertor
 
+
+crun.dosage_convertor vcftools --gzvcf pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes_v42.vcf.gz --relatedness2 --out pver_all_QDPSB_MISSMAF001filtered_ld_pruned_0.2_genotypes_v42.relatedness2
+
+crun.dosage_convertor vcftools --gzvcf pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_v42.vcf.gz --relatedness2 --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_v42.relatedness2
+```
 
 
 
