@@ -484,6 +484,7 @@ done
 ```
 
 ```bash
+less -S dupstat_summary.tsv
 ```
 ```
 FILE    LIBRARY READ_PAIRS_EXAMINED     PERCENT_DUPLICATION
@@ -667,4 +668,376 @@ sbatch merge_bams_by_sample_array.slurm
 cd $BASEDIR/pver_gwas/hologenome_mapped_all/merged_bams
 
 ls *merged.bam > ../sample_lists/merged_bams_list.txt
+```
+
+### Dedup merged bams
+`dedup_merged_bams_array.slurm`:
+```bash
+#!/bin/bash
+
+#SBATCH --job-name dedup_merged_bams_array_2025-08-05
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-381%12
+#SBATCH --ntasks=1
+#SBATCH --mem=190G
+#SBATCH --time 14-00:00:00
+#SBATCH --cpus-per-task=20
+
+
+## Load modules
+module load container_env
+module load container_env gatk
+GATK='crun.gatk gatk'
+module load samtools
+
+## Define some variables
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams
+OUTDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams
+SAMPLELIST=$BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/merged_bams_list.txt
+
+## Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+## Select the SAMPLE from the SAMPLELIST
+SAMPLEFILE=`head $SAMPLELIST -n $SLURM_ARRAY_TASK_ID | tail -n 1`
+
+## Keep record of sample file
+echo $SAMPLEFILE
+
+## Make directory
+mkdir -p $OUTDIR
+
+
+## Query-sort for duplicate removal with GATK
+# Run SortSam to sort by query name and convert to BAM
+$GATK --java-options "-Xmx190G" SortSam \
+  --INPUT $BAMDIR/$SAMPLEFILE \
+  --OUTPUT $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
+  --SORT_ORDER queryname
+
+# Run validation of BAM file
+$GATK --java-options "-Xmx190G" ValidateSamFile \
+  -I $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
+  -O $BAMDIR/${SAMPLEFILE%.*}'_qsorted.val' \
+  -M VERBOSE
+
+## Mark and remove duplicates
+$GATK --java-options "-Xmx190G" MarkDuplicates \
+  -I $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam' \
+  -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
+  --METRICS_FILE $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dupstat.txt' \
+  --REMOVE_DUPLICATES true
+
+## Run validation of BAM file
+$GATK --java-options "-Xmx190G" ValidateSamFile \
+  -I $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
+  -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.val' \
+  -M VERBOSE
+
+## Remove qsorted BAM files to make space
+rm $BAMDIR/${SAMPLEFILE%.*}'_qsorted.bam'
+
+## Run SortSam to sort by coordinate for downstream processing
+$GATK --java-options "-Xmx190G" SortSam \
+  --INPUT $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam' \
+  --OUTPUT $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.bam' \
+  --SORT_ORDER coordinate
+
+## Run validation of coordinate-sorted BAM file
+$GATK --java-options "-Xmx190G" ValidateSamFile \
+  -I $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.bam' \
+  -O $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.val' \
+  -M VERBOSE
+
+# Index final coordinate-sorted bam for use in GATK3 IndelRealigner
+crun.samtools samtools index -@ 20 $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup_coordsorted.bam'
+
+## Remove qsorted deduped BAM files to make space
+rm $OUTDIR/${SAMPLEFILE%.*}'_qsorted_dedup.bam'
+```
+
+<br>
+
+
+Check duplication rate in merged bams:
+
+`summarize_dedup_mergedbams.sh`
+```bash
+#!/bin/bash
+
+# Create output file
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams
+OUTFILE=$BAMDIR/dupstat_summary_mergedbams.tsv
+
+
+# Change working directory
+cd $BAMDIR
+
+# Print header
+echo -e "FILE\tLIBRARY\tUNPAIRED_READS_EXAMINED\tREAD_PAIRS_EXAMINED\tSECONDARY_OR_SUPPLEMENTARY_RDS\tUNMAPPED_READS\tUNPAIRED_READ_DUPLICATES\tREAD_PAIR_DUPLICATES\tREAD_PAIR_OPTICAL_DUPLICATES\tPERCENT_DUPLICATION\tESTIMATED_LIBRARY_SIZE" > $OUTFILE
+
+# Loop through all dupstat files
+for FILE in `ls *dupstat.txt`; do
+    # Extract the second line after the "## METRICS CLASS" line (i.e., the actual data)
+    DATA=$(awk '/^## METRICS CLASS/ {getline; getline; print}' "$FILE")
+
+    # Print data to outfile
+    echo -e "$FILE\t$DATA" >> $OUTFILE
+
+done
+```
+
+```bash
+ sort -k10,10 dupstat_summary_mergedbams.tsv | cut -f1,2,10 | less -S
+```
+```
+FILE    LIBRARY PERCENT_DUPLICATION
+2024_AOAA_Pver_03_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_AOAA_Pver_031A     0
+2024_OFU3_Pver_14_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_141A     0
+2024_OFU3_Pver_16_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_161A     0
+2024_FMAL_Pspp_Extra1_1_UCEexon2068ref_merged_qsorted_dupstat.txt       2024_FMAL_Pspp_Extra11A 0.003988
+2024_OFU3_Pver_12_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_121A     0.008197
+2024_OFU3_Pver_18_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_181A     0.036847
+2024_OFU3_Pver_27_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_271A     0.059701
+2024_MALO_Pver_06_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_MALO_Pver_061A     0.096774
+2024_FTEL_Pver_23_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_FTEL_Pver_231A     0.097307
+2024_OFU3_Pver_24_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_241A     0.1
+2024_MALO_Pver_10_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_MALO_Pver_101A     0.102068
+2024_FALU_Pver_07_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_FALU_Pver_071A     0.102355
+2024_FALU_Pver_05_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_FALU_Pver_051A     0.102444
+2024_AOAA_Pver_19_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_AOAA_Pver_191A     0.103454
+...
+2024_OFU3_Pver_34_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_341A     0.156022
+2024_FASA_Pver_16_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_FASA_Pver_161A     0.159285
+2024_OFU3_Pver_33_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_331A     0.159395
+2024_OFU6_Pver_25_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU6_Pver_251A     0.159652
+2024_AOAA_Pver_21_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_AOAA_Pver_211A     0.161582
+2024_MALO_Pver_28_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_MALO_Pver_281A     0.161631
+2024_OFU3_Pver_02_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_021A     0.161936
+2024_OFU3_Pver_20_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_201A     0.162667
+2024_OFU6_Pver_31_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU6_Pver_311A     0.163593
+2024_OFU6_Pver_10_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU6_Pver_101A     0.165318
+2024_OFU3_Pver_07_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU3_Pver_071A     0.16784
+2024_OFU6_Pver_09_2_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU6_Pver_092A     0.184142
+2024_OFU6_Pver_22_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_OFU6_Pver_221A     0.184584
+2024_LEON_Pver_07_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_LEON_Pver_071A     0.18908
+2024_FASA_Pver_15_1_UCEexon2068ref_merged_qsorted_dupstat.txt   2024_FASA_Pver_151A     0.211009
+```
+Duplication rates were mostly in the 10-15% range.
+
+<br>
+
+### Realign reads around indels
+
+Create list of batch1 (pilot) dedup bams:
+```bash
+cd $BASEDIR/pver_gwas/UCE_exon_mapping/bam/batch1_bams
+ls *.bam > $BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/batch1_bams_list.txt
+```
+
+<br>
+
+Filter bams to keep only aligned read pairs to reduce .bam size:
+`filter_for_aligned_reads_array_batch1.slurm`
+```bash
+#!/bin/bash
+
+#SBATCH --job-name filter_for_aligned_reads_array_batch1_2025-08-14
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-16%16
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 14-00:00:00
+#SBATCH --cpus-per-task=16
+
+
+## Load modules
+module load container_env
+module load container_env gatk
+GATK='crun.gatk gatk'
+module load samtools
+
+## Define some variables
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/batch1_bams
+OUTDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/batch1_bams/filtered_bams
+SAMPLELIST=$BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/batch1_bams_list.txt
+
+## Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+## Select the SAMPLE from the SAMPLELIST
+SAMPLEFILE=`head $SAMPLELIST -n $SLURM_ARRAY_TASK_ID | tail -n 1`
+
+## Keep record of sample file
+echo $SAMPLEFILE
+
+## Make directory
+mkdir -p $OUTDIR
+
+
+# Filter BAM file to include only aligned read pairs
+crun.samtools samtools view -@16 -b -f 3 $BAMDIR/$SAMPLEFILE > $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.bam'
+
+## Run validation of filtered BAM file
+$GATK --java-options "-Xmx100G" ValidateSamFile \
+  -I $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.bam' \
+  -O $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.val' \
+  -M VERBOSE
+
+
+# Index filtered BAM for use in GATK3 IndelRealigner
+crun.samtools samtools index -@ 16 $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.bam'
+```
+
+<br>
+
+Create list of batch2/3 merged and deduped bams:
+```bash
+cd $BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams
+ls *.bam > $BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/batch23_merged_deduped_bams_list.txt
+```
+
+<br>
+
+`filter_for_aligned_reads_array_batch23.slurm`
+```bash
+#!/bin/bash
+
+#SBATCH --job-name filter_for_aligned_reads_array_batch23_2025-08-14
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-381%16
+#SBATCH --ntasks=1
+#SBATCH --mem=100G
+#SBATCH --time 14-00:00:00
+#SBATCH --cpus-per-task=16
+
+
+## Load modules
+module load container_env
+module load container_env gatk
+GATK='crun.gatk gatk'
+module load samtools
+
+## Define some variables
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams
+OUTDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams
+SAMPLELIST=$BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/batch23_merged_deduped_bams_list.txt
+
+## Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+## Select the SAMPLE from the SAMPLELIST
+SAMPLEFILE=`head $SAMPLELIST -n $SLURM_ARRAY_TASK_ID | tail -n 1`
+
+## Keep record of sample file
+echo $SAMPLEFILE
+
+## Make directory
+mkdir -p $OUTDIR
+
+
+# Filter BAM file to include only aligned read pairs
+crun.samtools samtools view -@16 -b -f 3 $BAMDIR/$SAMPLEFILE > $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.bam'
+
+## Run validation of filtered BAM file
+$GATK --java-options "-Xmx100G" ValidateSamFile \
+  -I $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.bam' \
+  -O $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.val' \
+  -M VERBOSE
+
+
+# Index filtered BAM for use in GATK3 IndelRealigner
+crun.samtools samtools index -@ 16 $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.bam'
+```
+
+
+
+
+First link the bams from the pilot samples (which didn't need to be merged) to the new merged_bams/dedup_bams/filtered_bams directory using the same naming convention as the merged/deduped bams:
+```bash
+cd $BASEDIR/pver_gwas/UCE_exon_mapping/bam/batch1_bams/*.bam
+
+ln -s 2024_VATI_Pver_21_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_22_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_23_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_24_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_25_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_26_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_27_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_28_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_29_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_30_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_31_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_32_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_33_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_34_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_35_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+ln -s 2024_VATI_Pver_36_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
+```
+
+Make list of deduped merged bams (including the pilot samples):
+```bash
+ls $BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/*.bam
+ls $BASEDIR/pver_gwas/UCE_exon_mapping/bam/batch1_bams/*.bam
+```
+
+<br>
+
+`indel_realignment.slurm`
+```bash
+#!/bin/bash
+
+#SBATCH --job-name indel_realignment_2024-08-07
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --ntasks=1
+#SBATCH --mem=200G
+#SBATCH --time 5-00:00:00
+#SBATCH --cpus-per-task=38
+
+BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
+BAMLIST=$BASEDIR/pver_gwas_pilot/sample_lists/dedup_clipped_bam_fullpath.list # Path to a list of merged, deduplicated, and overlap clipped bam files. Must be indexed. Full paths should be included. This file has to have a suffix of ".list".
+REFERENCE=$BASEDIR/references/genomes/combined_pver_cd_hologenome.fa
+
+
+## Realign around in-dels
+# This is done across all samples at once!
+module load container_env gatk/3.8
+
+## Create list of potential in-dels
+crun.gatk gatk3 -Xmx200g \
+-T RealignerTargetCreator \
+-R $REFERENCE \
+-I $BAMLIST \
+-o $BASEDIR'/pver_gwas_pilot/bam/dedup_bams/clipped_bams/all_samples_for_indel_realigner.intervals' \
+-drf BadMate \
+-nt 38 # number of threads to use
+
+## Run the indel realigner tool
+crun.gatk gatk3 -Xmx100g \
+-T IndelRealigner \
+-R $REFERENCE \
+-I $BAMLIST \
+-targetIntervals $BASEDIR'/pver_gwas_pilot/bam/dedup_bams/clipped_bams/all_samples_for_indel_realigner.intervals' \
+--consensusDeterminationModel USE_READS  \
+--nWayOut _realigned.bam
 ```
