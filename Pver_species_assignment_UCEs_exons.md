@@ -966,57 +966,36 @@ $GATK --java-options "-Xmx100G" ValidateSamFile \
 crun.samtools samtools index -@ 16 $OUTDIR/${SAMPLEFILE%.*}'_alignedpairs.bam'
 ```
 
-
-
-
-First link the bams from the pilot samples (which didn't need to be merged) to the new merged_bams/dedup_bams/filtered_bams directory using the same naming convention as the merged/deduped bams:
-```bash
-cd $BASEDIR/pver_gwas/UCE_exon_mapping/bam/batch1_bams/*.bam
-
-ln -s 2024_VATI_Pver_21_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_22_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_23_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_24_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_25_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_26_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_27_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_28_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_29_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_30_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_31_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_32_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_33_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_34_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_35_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-ln -s 2024_VATI_Pver_36_1_A_R24114_L008_bwa_UCEexon2068ref_qsorted_dedup_coordsorted.bam
-```
+<br>
 
 Make list of deduped merged bams (including the pilot samples):
 ```bash
-ls $BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/*.bam
-ls $BASEDIR/pver_gwas/UCE_exon_mapping/bam/batch1_bams/*.bam
+ls /archive/barshis/barshislab/jtoy/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/*.bam > $BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/dedup_filtered_bam_fullpath.list
+ls /archive/barshis/barshislab/jtoy/pver_gwas/UCE_exon_mapping/bam/batch1_bams/filtered_bams/*.bam >> $BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/dedup_filtered_bam_fullpath.list
 ```
 
 <br>
+
+Run RealignerTargetCreator and IndelRealigner:
 
 `indel_realignment.slurm`
 ```bash
 #!/bin/bash
 
-#SBATCH --job-name indel_realignment_2024-08-07
+#SBATCH --job-name indel_realignment_2025-08-14
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jtoy@odu.edu
 #SBATCH --partition=main
 #SBATCH --ntasks=1
-#SBATCH --mem=200G
-#SBATCH --time 5-00:00:00
+#SBATCH --mem=300G
+#SBATCH --time 14-00:00:00
 #SBATCH --cpus-per-task=38
 
-BASEDIR=/cm/shared/courses/dbarshis/barshislab/jtoy
-BAMLIST=$BASEDIR/pver_gwas_pilot/sample_lists/dedup_clipped_bam_fullpath.list # Path to a list of merged, deduplicated, and overlap clipped bam files. Must be indexed. Full paths should be included. This file has to have a suffix of ".list".
-REFERENCE=$BASEDIR/references/genomes/combined_pver_cd_hologenome.fa
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMLIST=$BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/dedup_filtered_bam_fullpath.list # Path to a list of merged, deduplicated, and overlap clipped bam files. Must be indexed. Full paths should be included. This file has to have a suffix of ".list".
+REFERENCE=$BASEDIR/pver_gwas/UCE_exon_mapping/references/Pocillopora_UCEs_exons_2068_ref_sequences.fasta
 
 
 ## Realign around in-dels
@@ -1024,20 +1003,18 @@ REFERENCE=$BASEDIR/references/genomes/combined_pver_cd_hologenome.fa
 module load container_env gatk/3.8
 
 ## Create list of potential in-dels
-crun.gatk gatk3 -Xmx200g \
+crun.gatk gatk3 -Xmx300g \
 -T RealignerTargetCreator \
 -R $REFERENCE \
 -I $BAMLIST \
--o $BASEDIR'/pver_gwas_pilot/bam/dedup_bams/clipped_bams/all_samples_for_indel_realigner.intervals' \
--drf BadMate \
+-o $BASEDIR'/pver_gwas/UCE_exon_mapping/merged_bams/dedup_bams/filtered_bams/target.intervals' \
 -nt 38 # number of threads to use
 
 ## Run the indel realigner tool
-crun.gatk gatk3 -Xmx100g \
+crun.gatk gatk3 -Xmx300g \
 -T IndelRealigner \
 -R $REFERENCE \
 -I $BAMLIST \
--targetIntervals $BASEDIR'/pver_gwas_pilot/bam/dedup_bams/clipped_bams/all_samples_for_indel_realigner.intervals' \
---consensusDeterminationModel USE_READS  \
+-targetIntervals $BASEDIR'/pver_gwas/UCE_exon_mapping/merged_bams/dedup_bams/filtered_bams/target.intervals' \
 --nWayOut _realigned.bam
 ```
