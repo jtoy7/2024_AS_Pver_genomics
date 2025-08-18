@@ -1007,7 +1007,7 @@ crun.gatk gatk3 -Xmx300g \
 -T RealignerTargetCreator \
 -R $REFERENCE \
 -I $BAMLIST \
--o $BASEDIR'/pver_gwas/UCE_exon_mapping/merged_bams/dedup_bams/filtered_bams/target.intervals' \
+-o $BASEDIR'/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/target.intervals' \
 -nt 38 # number of threads to use
 
 ## Run the indel realigner tool
@@ -1015,6 +1015,6 @@ crun.gatk gatk3 -Xmx300g \
 -T IndelRealigner \
 -R $REFERENCE \
 -I $BAMLIST \
--targetIntervals $BASEDIR'/pver_gwas/UCE_exon_mapping/merged_bams/dedup_bams/filtered_bams/target.intervals' \
+-targetIntervals $BASEDIR'/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/target.intervals' \
 --nWayOut _realigned.bam
 ```
