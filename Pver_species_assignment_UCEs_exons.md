@@ -1082,9 +1082,15 @@ crun.gatk samtools index $OUTDIR/$(basename ${SAMPLEFILE%.*})_realigned.bam
 # summarize alignment stats
 crun.gatk samtools flagstat $OUTDIR/$(basename ${SAMPLEFILE%.*})_realigned.bam
 ```
-This indeed resulted in fewer of these "too many reads" warnings. Only one interval (uce-113569:11-495) was skipped in 165 out of 397 files.
+This indeed resulted in no "too many reads" warnings.
 
 <br>
+
+Parse samtools flagstat output
+```bash
+
+
+```
 
 ## Call Variants with bcftools
 `call_variants.slurm`
@@ -1101,3 +1107,4 @@ crun.bcftools bcftools mpileup -A -B -I -Ou -a AD,DP,SP,INFO/AD -f $REFERENCE \
 	-R $SITELIST -b $BAMLIST \
   | crun.bcftools bcftools call -mv --threads 38 -Ob –o $OUTDIR/Calls_17465SNP_AS.bcf
 ```
+
