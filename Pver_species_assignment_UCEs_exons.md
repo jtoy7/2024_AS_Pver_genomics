@@ -1018,3 +1018,86 @@ crun.gatk gatk3 -Xmx300g \
 -targetIntervals $BASEDIR'/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/target.intervals' \
 --nWayOut _realigned.bam
 ```
+This ran successfully and RealignerTargetCreator identified 151 intervals for potential realignment, but because all samples were being processed simultaneously, there were 147 intervals that were skipped "because there were too many reads".
+
+<br>
+
+I decided to try rerunning it in a per-sample fasion, using an array job:
+
+`indel_realignment_persample_array.slurm`
+```bash
+#!/bin/bash
+
+#SBATCH --job-name indel_realignment_persample_array_2025-08-18
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-397%100
+#SBATCH --ntasks=1
+#SBATCH --mem=16G
+#SBATCH --time 14-00:00:00
+#SBATCH --cpus-per-task=1
+
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMLIST=$BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/dedup_filtered_bam_fullpath.list # Path to a list of merged, deduplicated, and overlap clipped bam files. Must be indexed. Full paths should be included. This file has to have a suffix of .list
+REFERENCE=$BASEDIR/pver_gwas/UCE_exon_mapping/references/Pocillopora_UCEs_exons_2068_ref_sequences.fasta
+OUTDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/realigned_bams
+
+## Keep a record of the Job ID
+echo $SLURM_JOB_ID
+
+## Select the SAMPLE from the SAMPLELIST
+SAMPLEFILE=`head $BAMLIST -n $SLURM_ARRAY_TASK_ID | tail -n 1`
+
+## Keep record of sample file
+echo $SAMPLEFILE
+
+
+mkdir -p $OUTDIR
+
+
+## Realign around in-dels
+module load container_env
+module load gatk/3.8
+
+
+ulimit -a
+
+
+## Run the indel realigner tool
+crun.gatk gatk3 -Xmx16g \
+-T IndelRealigner \
+-R $REFERENCE \
+-I $SAMPLEFILE \
+-targetIntervals $BASEDIR'/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/target.intervals' \
+--maxReadsForRealignment 60000 \
+--maxReadsInMemory 600000 \
+-o $OUTDIR/$(basename ${SAMPLEFILE%.*})_realigned.bam
+
+# index output
+crun.gatk samtools index $OUTDIR/$(basename ${SAMPLEFILE%.*})_realigned.bam
+
+# summarize alignment stats
+crun.gatk samtools flagstat $OUTDIR/$(basename ${SAMPLEFILE%.*})_realigned.bam
+```
+This indeed resulted in fewer of these "too many reads" warnings. Only one interval (uce-113569:11-495) was skipped in 165 out of 397 files.
+
+<br>
+
+## Call Variants with bcftools
+`call_variants.slurm`
+```bash
+BASEDIR=/archive/barshis/barshislab/jtoy/
+BAMLIST=$BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/realigned_bam_fullpath.list
+REFERENCE=$BASEDIR/pver_gwas/UCE_exon_mapping/references/Pocillopora_UCEs_exons_2068_ref_sequences.fasta
+SITELIST=$BASEDIR/pver_gwas/UCE_exon_mapping/references/List_Phylo2023_17465SNP.txt
+OUTDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/vcf
+
+module load bcftools
+
+crun.bcftools bcftools mpileup -A -B -I -Ou -a AD,DP,SP,INFO/AD -f $REFERENCE \
+	-R $SITELIST -b $BAMLIST \
+  | crun.bcftools bcftools call -mv --threads 38 -Ob –o $OUTDIR/Calls_17465SNP_AS.bcf
+```
