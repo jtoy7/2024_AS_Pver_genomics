@@ -1088,23 +1088,133 @@ This indeed resulted in no "too many reads" warnings.
 
 Parse samtools flagstat output
 ```bash
+echo -e "Sample\tPrimaryMappedReads" > $BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/realigned_bams/realigned_bams_flagstat_summary.txt
 
-
+for FILE in *2025-08-18.out; do
+  SAMPLE=$(grep "/archive/barshis/barshislab/jtoy/pver_gwas/UCE_exon_mapping/bam/" $FILE | awk -F'/' '{print $NF}' | cut -d "_" -f2,3,4,5)
+  MAPREADS=$(grep "primary mapped" $FILE | cut -d " " -f1)
+  echo -e "$SAMPLE\t$MAPREADS" >> $BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/realigned_bams/realigned_bams_flagstat_summary.txt
+done
 ```
 
+<br>
+
+```bash
+less $BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/realigned_bams/realigned_bams_flagstat_summary.txt
+```
+```
+Sample  PrimaryMappedReads
+FALU_Pver_14_1  4004794
+FALU_Pver_15_1  3072296
+FALU_Pver_16_1  2725312
+FALU_Pver_17_1  4887958
+FALU_Pver_18_1  3403602
+FALU_Pver_19_1  3767356
+FALU_Pver_20_1  3196772
+FALU_Pver_21_1  3203152
+FALU_Pver_22_1  2513808
+```
+AOAA_Pver_03_1 has 0 mapped reads. All other samples have between 1 million and 8.2 million reads.
+
+<br>
+
 ## Call Variants with bcftools
+First need to fix an issue with the read groups labels for the technical replicate samples. BCFtools will merge alignments with the same sample ID, even if they come from different bam files, and right now both technical replicates for the 4 repeated samples have the same read group sample name.
+
+First move tech rep 2 files to a new directory:
+```bash
+cd $BASEDIR/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/realigned_bams
+
+mkdir techrep_originals
+
+mv 2024_FALU_Pver_23_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned* techrep_originals
+mv 2024_FASA_Pver_34_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned* techrep_originals
+mv 2024_LEON_Pver_14_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned* techrep_originals
+mv 2024_OFU6_Pver_09_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned* techrep_originals
+```
+
+Change sample names of 2nd replicates to unique names:
+```bash
+crun.samtools samtools view -H 2024_FALU_Pver_23_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam > header.sam
+sed -E 's/SM:[^[:space:]]+/SM:2024_FALU_Pver_23_2/' header.sam > new_header.sam
+crun.samtools samtools reheader new_header.sam 2024_FALU_Pver_23_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam > ../2024_FALU_Pver_23_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam
+crun.samtools samtools index ../2024_FALU_Pver_23_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam
+
+
+crun.samtools samtools view -H 2024_FASA_Pver_34_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam > header.sam
+sed -E 's/SM:[^[:space:]]+/SM:2024_FASA_Pver_34_2/' header.sam > new_header.sam
+crun.samtools samtools reheader new_header.sam 2024_FASA_Pver_34_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam > ../2024_FASA_Pver_34_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam
+crun.samtools samtools index ../2024_FASA_Pver_34_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam
+
+
+crun.samtools samtools view -H 2024_LEON_Pver_14_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam > header.sam
+sed -E 's/SM:[^[:space:]]+/SM:2024_LEON_Pver_14_2/' header.sam > new_header.sam
+crun.samtools samtools reheader new_header.sam 2024_LEON_Pver_14_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam > ../2024_LEON_Pver_14_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam
+crun.samtools samtools index ../2024_LEON_Pver_14_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam
+
+
+crun.samtools samtools view -H 2024_OFU6_Pver_09_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam > header.sam
+sed -E 's/SM:[^[:space:]]+/SM:2024_OFU6_Pver_09_2/' header.sam > new_header.sam
+crun.samtools samtools reheader new_header.sam 2024_OFU6_Pver_09_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam > ../2024_OFU6_Pver_09_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam
+crun.samtools samtools index ../2024_OFU6_Pver_09_2_UCEexon2068ref_merged_qsorted_dedup_coordsorted_alignedpairs_realigned.bam
+```
+
+Make new bam list:
+```bash
+ls /archive/barshis/barshislab/jtoy/pver_gwas/UCE_exon_mapping/bam/merged_bams/dedup_bams/filtered_bams/realigned_bams/*.bam > $BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/realigned_bam_fullpath.list
+```
+
+<br>
+
+Run variant calling:
+
 `call_variants.slurm`
 ```bash
+#!/bin/bash
+
+#SBATCH --job-name call_variants_2025-08-19
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --ntasks=1
+#SBATCH --mem=360G
+#SBATCH --time 14-00:00:00
+#SBATCH --cpus-per-task=38
+
+
 BASEDIR=/archive/barshis/barshislab/jtoy/
 BAMLIST=$BASEDIR/pver_gwas/UCE_exon_mapping/sample_lists/realigned_bam_fullpath.list
 REFERENCE=$BASEDIR/pver_gwas/UCE_exon_mapping/references/Pocillopora_UCEs_exons_2068_ref_sequences.fasta
 SITELIST=$BASEDIR/pver_gwas/UCE_exon_mapping/references/List_Phylo2023_17465SNP.txt
 OUTDIR=$BASEDIR/pver_gwas/UCE_exon_mapping/vcf
 
+mkdir -p $OUTDIR
+
+
+module load container_env
 module load bcftools
 
 crun.bcftools bcftools mpileup -A -B -I -Ou -a AD,DP,SP,INFO/AD -f $REFERENCE \
 	-R $SITELIST -b $BAMLIST \
-  | crun.bcftools bcftools call -mv --threads 38 -Ob –o $OUTDIR/Calls_17465SNP_AS.bcf
+    | crun.bcftools bcftools call -mv --threads 38 -Ob -o $OUTDIR/Calls_17465SNP_AS.bcf
+```
+Run time: 4.5 hrs
+
+<br>
+
+Get summary stats for .bcf file:
+```bash
+crun.bcftools bcftools stats Calls_17465SNP_AS.bcf > Calls_17465SNP_AS.stats
 ```
 
+Get the per sample depth at each position:
+```bash
+crun.bcftools bcftools query -f '%CHROM\t%POS[\t%DP]\n' Calls_17465SNP_AS.bcf > Calls_17465SNP_AS.per_sample_depth
+```
+
+Get the total site depth per position, i.e., the sum of read depths from all samples at each variant site, using the INFO/DP field:
+```bash
+crun.bcftools bcftools query -f '%CHROM\t%POS\t%INFO/DP\n' Calls_17465SNP_AS.bcf > Calls_17465SNP_AS.total_site_depth
+```
