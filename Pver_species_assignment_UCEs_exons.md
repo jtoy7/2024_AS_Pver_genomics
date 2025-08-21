@@ -1218,3 +1218,9 @@ Get the total site depth per position, i.e., the sum of read depths from all sam
 ```bash
 crun.bcftools bcftools query -f '%CHROM\t%POS\t%INFO/DP\n' Calls_17465SNP_AS.bcf > Calls_17465SNP_AS.total_site_depth
 ```
+
+Plot the per sample depth at each position in R:
+```r
+
+```
+![alt text](<Screenshot 2025-08-20 100304.png>)
