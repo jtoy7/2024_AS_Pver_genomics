@@ -3219,6 +3219,9 @@ crun.plink plink2 \
 - `1` → step size (how many SNPs to shift the window each time; must be 1 bp when specifying window size in kb)
 - `0.2` → r² threshold (SNPs with pairwise r² > 0.2 are considered linked)
 
+<br>
+<br>
+
 I used r2 > 0.2 to conservatively remove linked SNPs for population structure analysis, but the more lenient SNP set (r2 > 0.5) may be useful for other downstream analyses.
 
 ### Filter dataset using pruned SNP list (stringent)
@@ -3344,8 +3347,102 @@ crun.dosage_convertor vcftools --gzvcf pver_all_QDPSB_MISSMAF05filtered_ld_prune
 ```
 
 
+### Plot distribution of comparisons in R
+```r
+### Try using IBD (PI_HAT)
+relatedness <- read.table("pver_all_QDPSB_MISSMAF002filtered_ld_pruned_0.2_relatedness.genome", header = TRUE) %>% 
+  separate(IID1, into = c("Year", "Location", "Species", "Genotype", "TechRep"), remove = FALSE) %>% 
+  separate(IID2, into = c("Year2", "Location2", "Species2", "Genotype2", "TechRep2"), remove = FALSE) %>% 
+  mutate(Sample1 = paste(Year, Location, Species, Genotype, sep = "_"),
+         Sample2 = paste(Year2, Location2, Species2, Genotype2, sep = "_")
+         )
+
+# Plot distribution of PI_HAT values
+ggplot(relatedness, aes(x = PI_HAT)) +
+  geom_histogram(binwidth = 0.01, fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Pairwise PI_HAT Distribution", x = "PI_HAT", y = "Count")
+  # Vast majority of comparisons have PI_HAT of 0
+
+# Remove the 0 values to better visualize the rest of the distribution
+ggplot(relatedness %>% filter(PI_HAT > 0), aes(x = PI_HAT)) +
+  geom_histogram(binwidth = 0.01, fill = "steelblue") +
+  theme_minimal() +
+  geom_vline(xintercept = 0.90) +
+  labs(title = "Pairwise PI_HAT Distribution (non-zero)", x = "PI_HAT", y = "Count")
+
+techreps <- relatedness %>% filter(Sample1 == Sample2)
+# Comparisons between the 4 samples with technical replicates have PI_HAT values of 1.0000, 0.9175, 1.0000, and 1.0000. Upper peak (close to 1) ends at 0.8912.
+
+clones <- relatedness %>% filter(PI_HAT >= 0.89)
+# But the PI_HAT values for other comparisons are also higher. This identifies 1087 comparisons!
+
+c(clones$Sample1, clones$Sample2) %>% unique() %>% length()
+# ...corresponding to 309 unique samples!
 
 
+
+### Try using relatedness measure from VCFtools --relatedness2 option (based on KING approach)
+# It estimates additive genetic relatedness based on allele sharing, not on assumed HWE like PLINK --genome does.
+# This method should be more accurate when there is inbreeding, because it uses actual allele frequencies from the data.
+
+relatedness2 <- read.table("pver_all_QDPSB_MISSMAF002filtered_genotypes_v42.relatedness2.relatedness2", header = TRUE) %>% 
+  filter(INDV1 != INDV2) %>% 
+  separate(INDV1, into = c("Year", "Location", "Species", "Genotype", "TechRep"), remove = FALSE) %>% 
+  separate(INDV2, into = c("Year2", "Location2", "Species2", "Genotype2", "TechRep2"), remove = FALSE) %>% 
+  mutate(Sample1 = paste(Year, Location, Species, Genotype, sep = "_"),
+         Sample2 = paste(Year2, Location2, Species2, Genotype2, sep = "_")) %>% 
+  rowwise() %>%
+  mutate(PairID = paste(sort(c(INDV1, INDV2)), collapse = "_")) %>% # remove repeated pairs that just have INDV1 and INDV2 swapped
+  ungroup() %>%
+  distinct(PairID, .keep_all = TRUE)
+   
+
+# Plot distribution of PI_HAT values
+ggplot(relatedness2, aes(x = RELATEDNESS_PHI)) +
+  geom_histogram(binwidth = 0.005, fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Pairwise RELATEDNESS_PHI Distribution", x = "RELATEDNESS_PHI", y = "Count")
+# Vast majority of comparisons have relatedness near of 0, but peak is actually negative
+# Peaks around 0.25, 0.50, and 1, as well as two small negative peaks that likely represent comparisons of different species
+
+
+# Remove the values below 0 to better visualize the rest of the distribution
+ggplot(relatedness2 %>% filter(RELATEDNESS_PHI > 0), aes(x = RELATEDNESS_PHI)) +
+  geom_histogram(binwidth = 0.005, fill = "steelblue") +
+  geom_vline(xintercept = 0.42, linetype = "dashed") +
+  theme_minimal() +
+  labs(title = "Pairwise RELATEDNESS_PHI Distribution (non-zero)", x = "RELATEDNESS_PHI", y = "Count")
+
+
+
+techreps <- relatedness2 %>% filter(Sample1 == Sample2)
+# Comparisons between the 4 samples with technical replicates have RELATEDNESS_PHI values of > 0.494. 
+
+clones <- relatedness2 %>% filter(RELATEDNESS_PHI >= 0.42)
+# But the PI_HAT values for other comparisons are high, indicating clones. Peak in distribution mostly ends around 0.48. Three comparisons had relatedness less than 0.48 but greater than 0.42. This identifies 1090 comparisons!
+
+c(clones$Sample1, clones$Sample2) %>% unique() %>% length()
+# ...corresponding to 312 unique samples (that have at least one clone)!
+```
+![alt text](image-1.png)
+
+
+### Rerun PCA, nMDS, clustering, ADMIXTURE
+Use PLINK2 to run a PCA:
+```bash
+crun.plink plink2 \
+  --pgen pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.pgen \
+  --psam pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.psam \
+  --pvar pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.pvar \
+  --pca 395 \
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_pca
+
+# 1-N = 395
+```
+I calculated all possible PCs, then plotted the variance explained by the first 100:
+![alt text](image-2.png)
+Looks like the "elbow" is around K=19.
 
 <br>
 <br>
