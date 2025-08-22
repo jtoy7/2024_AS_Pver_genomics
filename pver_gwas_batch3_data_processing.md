@@ -3444,6 +3444,26 @@ I calculated all possible PCs, then plotted the variance explained by the first 
 ![alt text](image-2.png)
 Looks like the "elbow" is around K=19.
 
+Plot PCs:
+```r
+```
+![alt text](image-3.png)
+![alt text](image-4.png)
+![alt text](image-5.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <br>
 <br>
 <br>
