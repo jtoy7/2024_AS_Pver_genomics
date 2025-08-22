@@ -3427,9 +3427,10 @@ c(clones$Sample1, clones$Sample2) %>% unique() %>% length()
 ```
 ![alt text](image-1.png)
 
+<br>
 
 ### Rerun PCA, nMDS, clustering, ADMIXTURE
-Use PLINK2 to run a PCA:
+#### Use PLINK2 to run a PCA:
 ```bash
 crun.plink plink2 \
   --pgen pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.pgen \
@@ -3438,7 +3439,7 @@ crun.plink plink2 \
   --pca 395 \
   --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_pca
 
-# 1-N = 395
+# 1-N = 395 possible PCs
 ```
 I calculated all possible PCs, then plotted the variance explained by the first 100:
 ![alt text](image-2.png)
@@ -3454,9 +3455,97 @@ Plot PCs:
 ![alt text](image-7.png)
 ![alt text](image-8.png)
 
+<br>
+
+#### nMDS
+Calculate Identity-by-state distance (1 - proportion of alleles shared) with PLINK1:
+```bash
+# load PLINK v1.9
+module load plink/1.9-20240319
+
+# calculate distance matrix
+crun.plink plink \
+	--bfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
+	--allow-extra-chr \
+	--distance square 1-ibs \
+	--out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_mdist
+```
+
+Plot nMDS in R:
+```r
+###### nMDS ######
+library(vegan)
+
+# Read distance matrix (1-IBS)
+dist_matrix <- as.matrix(read.table("pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_mdist.mdist"))
+sample_ids <- read.table("pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_mdist.mdist.id")$V2
+
+# Assign row/col names to distance matrix
+rownames(dist_matrix) <- sample_ids
+colnames(dist_matrix) <- sample_ids
+
+# Compute nMDS
+set.seed(123)  # for reproducibility
+nmds_results <- metaMDS(dist_matrix, k = 2, trymax = 100)
+
+# View stress
+nmds_results$stress
+  # stress is small (0.058; less than 0.1), which is good
+
+# Get the scores (site coordinates in reduced space)
+nmds_scores <- as.data.frame(scores(nmds_results))
+nmds_scores$SampleID <- rownames(nmds_scores)
+
+nmds_plotdat <- nmds_scores %>% 
+  separate(SampleID, into = c("Year", "Location", "Species", "Genotype", "Rep"), sep = "_", remove = FALSE) %>% 
+  mutate(Location = as.factor(Location),
+         Species = as.factor(Species))
+
+# Plot all samples
+ggplot(nmds_plotdat, aes(x = NMDS1, y = NMDS2, shape = Species, color = Location)) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(15, 16)) +
+  geom_point(size = 2, alpha = 0.3) +
+  theme_minimal() +
+  labs(title = "nMDS all samples", x = "NMDS1", y = "NMDS2")
+
+# Restrict x-axis to remove likely Pocillopora grandis/eydouxi
+ggplot(nmds_plotdat, aes(x = NMDS1, y = NMDS2, shape = Species, color = Location)) +
+  geom_point(size = 2, alpha = 0.5) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(15, 16)) +
+  geom_point(size = 2, alpha = 0.3) +
+  xlim(c(0.0, 0.015)) +
+  theme_minimal() +
+  labs(title = "nMDS without 'Pspp' cluster", x = "NMDS1", y = "NMDS2")
+```
+![alt text](image-9.png)
+![alt text](image-10.png)
+
+<br>
+
+#### Hierarchical clustering
+Calculate clustering and mds that may be useful for later analyses
+```bash
+crun.plink plink \
+  --bfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
+  --distance square ibs \
+  --cluster \
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_ibsdist \
+  --allow-extra-chr
+```
+parameters:
+
+  --distance square ibs                       # calculates IBS distances
+  --cluster                                   # does hierarchal clustering (UPGMA) for you based on the distance matrix
+  --mds-plot 10                               # does MDS (PCoA) for you and gives coordinates as output
+  --allow-extra-chr                           # allows nonstandard chromosome names
 
 
-
+Visualize cluster in R:
+```r
+```
 
 
 
