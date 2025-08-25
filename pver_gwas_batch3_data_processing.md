@@ -3545,10 +3545,49 @@ parameters:
 
 Visualize cluster in R:
 ```r
+###### Hierarchical clustering ######
+# Convert distance matrix to a dist object
+dist_obj <- as.dist(dist_matrix)
+
+# Hierarchical clustering (default method = "complete")
+hc_ward <- hclust(dist_obj, method = "ward.D2")   # produces tight, interpretable clusters.
+hc_upgma <- hclust(dist_obj, method = "average")  # the standard, because it treats genetic distance more like evolutionary divergence, produces a tree resembling a phylogeny
+
+# Simple plot
+par(mfrow = c(2, 1))  # 2 rows, 1 column
+hcplot_ward <- plot(hc_ward, main = "Hierarchical Clustering of Samples", cex = 0.4)
+hcplot_upgma <- plot(hc_upgma, main = "Hierarchical Clustering of Samples", cex = 0.4)
+par(mfrow = c(1, 1))  # reset plotting device
+
+# Color by Location
+library(dendextend)
+
+# Convert hclust to dendrogram
+dend_upgma <- as.dendrogram(hc_upgma)
+
+# Extract labels in plotting order
+tip_labels <- labels(dend_upgma)
+
+# Extract Location from sample names
+split_names <- str_split_fixed(tip_labels, "_", 5)
+locations <- split_names[, 2]
+
+# Map sample locations to colors
+location_colors <- setNames(mypal, unique(locations))
+ordered_colors <- location_colors[locations]
+
+# Set label colors and text size
+dend_upgma <- dend_upgma %>%
+  dendextend::set("labels_col", ordered_colors) %>%
+  dendextend::set("labels_cex", 0.4)
+
+# Plot
+plot(dend_upgma, main = "UPGMA Clustering Colored by Location", cex = 0.2)
+
 ```
-
-
-
+![alt text](<Screenshot 2025-08-22 154648.png>)
+![alt text](<Screenshot 2025-08-22 163707.png>)
+Some evidence of population structure, but there are several locations with individuals that group into different clusters across the dendrogram. This is probably caused by the inclusion of multiple cryptic species, but hard to say for sure without species IDs.
 
 
 
