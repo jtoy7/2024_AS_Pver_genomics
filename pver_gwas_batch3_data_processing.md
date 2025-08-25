@@ -3485,7 +3485,7 @@ crun.plink plink \
 	--out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_relatedness
 ```
 
-#### Calculate relatedness with VCFtools (v0.1.16) (more robust to inbreeding)
+#### Calculate relatedness with VCFtools (v0.1.16) (more robust to inbreeding; similar to KING method)
 ```bash
 ## First downgrade VCF from v4.3 to v4.2 so it will work with VCFtools
 # MAF>0.002, unpruned
@@ -3591,6 +3591,129 @@ c(clones$Sample1, clones$Sample2) %>% unique() %>% length()
 # ...corresponding to 312 unique samples (that have at least one clone)!
 ```
 ![alt text](image-1.png)
+Peak near zero is good (most comparisons are unrelated). Concentrated small peak near 0.5 represents clones/replicates. Negative peaks represent comparisons that are less similar than expected based on population allele frequencies, which is what you would expect when different cryptic species are included.
+
+Using a threshold relatedness (PHI) value of 0.42, 1090 comparisons are identified as clonal, corresponding to 312 unique samples with at least one clone (including technical replicates).
+
+<br>
+
+### Visualize clone groups
+```r
+## Create an undirected graph from clone pairs
+library(igraph)
+
+# Create graph
+g <- graph_from_data_frame(clones[, c("Sample1", "Sample2")], directed = FALSE)
+
+# Plot graph
+plot(g, vertex.label = NA, vertex.size = 3, edge.color = "gray80", main = "Clone Groups")
+
+# Get connected components (i.e., clone groups)
+components <- components(g)
+
+# Print number of components (clone groups)
+components$no
+  # There are 69 clone groups
+
+# Look at how many samples are in each clone group (frequency table of number of groups with X number of samples)
+table(components$csize)
+
+# Plot histogram of group sizes
+group_sizes <- components$csize %>% as_tibble() %>% dplyr::rename(group_size = value)
+
+ggplot(group_sizes, aes(x = group_size)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
+  theme_minimal() +
+  labs(title = "Clone Group Size Distribution",
+       x = "Number of Samples per Clone Group",
+       y = "Count")
+  # Most frequent group size is 2. Largest is 18 (2 groups). 51 of the 69 groups have a size of 4 or less.
+
+
+# Extract all unique sample names from your graph and split names into metadata
+sample_metadata <- V(g)$name %>% 
+  as.tibble() %>% 
+  dplyr::rename(Sample = value) %>% 
+  separate(Sample, into = c("Year", "Location", "Species", "Genotype"), sep = "_", remove = FALSE) %>% 
+  mutate(CloneGroup = components$membership[Sample])
+
+# Create named vector of Location by sample
+site_by_sample <- setNames(sample_metadata$Location, sample_metadata$Sample)
+
+# Assign colors (use a palette if many sites)
+locations <- unique(site_by_sample)
+mypal2 <- mypal[-5] # remove Fagamalo color
+location_colors <- setNames(mypal2, locations)
+
+# Assign node colors to the graph
+V(g)$color <- location_colors[site_by_sample[V(g)$name]]
+
+
+# Plot with colors by location
+plot(g,
+     #vertex.label = NA,         # hide labels
+     vertex.label.cex = 0.4,
+     vertex.size = 3,
+     edge.color = "gray80",
+     main = "Clone Groups Colored by Collection Site")
+legend("topright", legend = names(location_colors),
+       col = location_colors, pch = 19, pt.cex = 1.5, cex = 0.6, bty = "n",
+       title = "Collection Site")
+```
+![alt text](<Screenshot 2025-08-25 143000.png>)
+There are a total of 69 different clone groups. The most frequent group size is 2. Largest is 18 (2 groups). 51 of the 69 groups have a size of 4 or less.
+
+![alt text](image-12.png)
+
+```r
+# Create separate plots by DominantLocation subgroup then stitch together
+# create a named vector from mypal vector
+mypal2_named <- mypal2
+names(mypal2_named) <- location_levels
+
+# Create plotting function
+plot_dominant_location <- function(tg, location, mypal2) {
+  # Subset graph to nodes with that DominantLocation
+  subgraph <- tg %>%
+    activate(nodes) %>%
+    filter(DominantLocation == location) %>% 
+    mutate(Location = factor(Location, levels = location_levels))  # force levels here
+  
+  # Compute layout for subset graph
+  coords <- create_layout(subgraph, layout = "fr")
+  
+  # Plot with points colored by Location (consistent palette)
+  ggraph(coords) +
+    geom_edge_link(alpha = 0.5) +
+    geom_edge_loop() +
+    geom_node_point(aes(color = Location), size = 3) +
+    #geom_node_text(aes(label = name), repel = TRUE, size = 2, check_overlap = TRUE) +
+    scale_color_manual(values = mypal2, drop = FALSE) +  # drop=FALSE keeps all colors in legend and mapping consistent
+    ggtitle(location) +
+    theme_graph() +
+    theme(legend.position = "none")  # hide legend
+}
+
+# Plot for all dominant locations
+dominant_locations <- tg %>%
+  activate(nodes) %>%
+  as_tibble() %>%
+  pull(DominantLocation) %>%
+  unique()
+
+plots <- lapply(dominant_locations, function(loc) {
+  plot_dominant_location(tg, loc, mypal2)
+})
+
+# Combine plots
+library(patchwork)
+wrap_plots(plots, ncol = 4)
+```
+![alt text](image-13.png)
+Technical replicates depicted as loops (FALU, FASA, LEON, OFU6)
+
+
+
 
 
 
