@@ -3593,7 +3593,7 @@ c(clones$Sample1, clones$Sample2) %>% unique() %>% length()
 ![alt text](image-1.png)
 Peak near zero is good (most comparisons are unrelated). Concentrated small peak near 0.5 represents clones/replicates. Negative peaks represent comparisons that are less similar than expected based on population allele frequencies, which is what you would expect when different cryptic species are included.
 
-Using a threshold relatedness (PHI) value of 0.42, 1090 comparisons are identified as clonal, corresponding to 312 unique samples with at least one clone (including technical replicates).
+Using a threshold relatedness (PHI) value of 0.42, 1090 comparisons are identified as clonal, corresponding to **312 unique samples with at least one clone** (including technical replicates). Excluding the 4 replicate sample, there are 392 total samples. This leaves **80 singleton samples with no clones** in the dataset. 80 singletons + 69 clone groups = **149 unique genotypes** in the dataset.
 
 <br>
 
@@ -3661,7 +3661,7 @@ legend("topright", legend = names(location_colors),
        title = "Collection Site")
 ```
 ![alt text](<Screenshot 2025-08-25 143000.png>)
-There are a total of 69 different clone groups. The most frequent group size is 2. Largest is 18 (2 groups). 51 of the 69 groups have a size of 4 or less.
+There are a total of 69 different clone groups. The most frequent group size is 2. Largest is 18 (2 groups). 51 of the 69 groups have a size of 4 or less. These counts include any technical replicates.
 
 ![alt text](image-12.png)
 
@@ -3712,7 +3712,80 @@ wrap_plots(plots, ncol = 4)
 ![alt text](image-13.png)
 Technical replicates depicted as loops (FALU, FASA, LEON, OFU6)
 
+```r
+### Build summary table of clonality at each site ###
 
+
+# Get all unique samples with metadata
+all_samples <- relatedness2 %>%
+  select(Sample = INDV1, Year, Location, Species, Genotype) %>%
+  bind_rows(
+    relatedness2 %>% 
+      select(Sample = INDV2, Year = Year2, Location = Location2, Species = Species2, Genotype = Genotype2)
+  ) %>%
+  distinct() %>% 
+  mutate(Rep = str_split_i(Sample, "_", 5))  # add column for replicate number
+
+all_samples_noreps <- all_samples %>% filter(Rep == "1") %>% 
+  mutate(Sample = str_sub(Sample, end = -3)) %>% 
+  select(-Rep)
+
+# Identify all samples involved in clone pairs
+clone_samples_noreps <- c(clones$Sample1, clones$Sample2) %>% unique()
+
+
+# Assign clone status
+all_samples_noreps <- all_samples_noreps %>%
+  mutate(Clone_Status = ifelse(Sample %in% clone_samples, "Clone", "Singleton"))
+
+# Double check counts
+table(all_samples_noreps$Clone_Status)
+
+## Count clone groups per location
+clone_groups <- tibble(
+  Sample = names(components$membership),
+  Clone_Group = components$membership
+)
+
+clone_groups_per_loc <- clone_groups %>%
+  left_join(all_samples_noreps, by = "Sample") %>%
+  group_by(Location) %>%
+  summarise(Clone_Group_Count = n_distinct(Clone_Group), .groups = "drop")
+
+## Add clone group column to all_samples_noreps
+all_samples_noreps <- all_samples_noreps %>% 
+  left_join(clone_groups, by = "Sample") %>% 
+  mutate(Clone_Group = replace_na(Clone_Group, 0))  # fill 0 if none
+
+## Step 5: final summary table
+summary_by_location <- all_samples_noreps %>%
+  group_by(Location) %>%
+  summarise(
+    Total_Samples = n(),
+    Singletons   = sum(Clone_Status == "Singleton"),
+    Clone_Samples = sum(Clone_Status == "Clone"),
+    .groups = "drop"
+  ) %>%
+  left_join(clone_groups_per_loc, by = "Location") %>% 
+  mutate(Clone_Group_Count = replace_na(Clone_Group_Count, 0)) %>% 
+  mutate(Total_Unique_Genotypes = Singletons + Clone_Group_Count) %>% 
+  arrange(desc(Total_Unique_Genotypes))
+
+summary_by_location
+```
+| Location | Total_Samples | Singletons | Clone_Samples | Clone_Group_Count | Total_Unique_Genotypes |
+|----------|---------------|------------|---------------|-------------------|------------------------|
+| FTEL     | 44            | 20         | 24            | 8                 | 28                     |
+| ALOF     | 43            | 12         | 31            | 8                 | 20                     |
+| OFU3     | 40            | 8          | 32            | 10                | 18                     |
+| VATI     | 40            | 7          | 33            | 10                | 17                     |
+| FALU     | 40            | 8          | 32            | 6                 | 14                     |
+| LEON     | 20            | 10         | 10            | 4                 | 14                     |
+| AOAA     | 42            | 4          | 38            | 9                 | 13                     |
+| FASA     | 42            | 4          | 38            | 6                 | 10                     |
+| MALO     | 40            | 6          | 34            | 4                 | 10                     |
+| OFU6     | 40            | 0          | 40            | 8                 | 8                      |
+| FMAL     | 1             | 1          | 0             | 0                 | 1                      |
 
 
 
