@@ -3593,7 +3593,7 @@ c(clones$Sample1, clones$Sample2) %>% unique() %>% length()
 ![alt text](image-1.png)
 Peak near zero is good (most comparisons are unrelated). Concentrated small peak near 0.5 represents clones/replicates. Negative peaks represent comparisons that are less similar than expected based on population allele frequencies, which is what you would expect when different cryptic species are included.
 
-Using a threshold relatedness (PHI) value of 0.42, 1090 comparisons are identified as clonal, corresponding to **312 unique samples with at least one clone** (including technical replicates). Excluding the 4 replicate sample, there are 392 total samples. This leaves **80 singleton samples with no clones** in the dataset. 80 singletons + 69 clone groups = **149 unique genotypes** in the dataset.
+Using a threshold relatedness (PHI) value of 0.42, 1090 comparisons are identified as clonal, corresponding to **312 unique samples with at least one clone** (including technical replicates; 308 excluding them). Excluding the 4 replicate sample, there are 392 total samples. This leaves **84 singleton samples with no clones** in the dataset. 84 singletons + 69 clone groups = **153 unique genotypes** in the dataset.
 
 <br>
 
