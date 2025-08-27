@@ -24,9 +24,15 @@ There are 4694 total pairs of fastq files.
 
 <br>
 
-Make combined sample table for all sequencing batches:
-```bash
-
+Make combined sample table for all sequencing batches. In this case. I just downloaded the sample list I just created and then used Excel to split the sample prefix components into new columns.
+`fastq_table_pver_its2.txt`
+```
+prefix  sample_id       year    population      species colony_id_by_location   seq_id  prep_id run_id  lane_id lane_number
+2024_ALOF_Pspp_Extra1_1_A_R24193_L005   2024_ALOF_Pspp_Extra1   2024    ALOF    Pspp    Extra1  1       A       R24193  L005    R24193_L005
+2024_ALOF_Pspp_Extra1_1_A_R24193_L006   2024_ALOF_Pspp_Extra1   2024    ALOF    Pspp    Extra1  1       A       R24193  L006    R24193_L006
+2024_ALOF_Pspp_Extra1_1_A_R24196_L001   2024_ALOF_Pspp_Extra1   2024    ALOF    Pspp    Extra1  1       A       R24196  L001    R24196_L001
+2024_ALOF_Pspp_Extra1_1_A_R24196_L002   2024_ALOF_Pspp_Extra1   2024    ALOF    Pspp    Extra1  1       A       R24196  L002    R24196_L002
+...
 ```
 
 ## Map to ITS2 Sequence Database
@@ -55,8 +61,8 @@ module load bowtie2/2.4.1
 BASEDIR=/archive/barshis/barshislab/jtoy/
 FASTQDIR=$BASEDIR/pver_gwas/its2_mapping_pver_all/trimmed_fastq_links #path to trimmed fastq.gz files
 OUTDIR=$BASEDIR/pver_gwas/its2_mapping_pver_all/its2_mapping
-SAMPLELIST=$BASEDIR/pver_gwas/its2_mapping_pver_all/sample_lists/fastq_list_pver_its2.txt # Path to a list of prefixes of the raw fastq files. It can be a subset of the the 1st column of the sample table.
-SAMPLETABLE=$BASEDIR/pver_gwas_pilot/sample_lists/fastq_table_pver_its2.txt # Path to a sample table
+SAMPLELIST=$BASEDIR/pver_gwas/its2_mapping_pver_all/sample_lists/fastq_list_pver_its2.txt # Path to a list of prefixes of the trimmed .fastq files
+SAMPLETABLE=$BASEDIR/pver_gwas/its2_mapping_pver_all/sample_lists/fastq_table_pver_its2.txt # Path to a sample table
 FASTQ_SUFFIX_1=_f_paired_trim.fastq.gz # Suffix to trimmed fastq files. Use forward reads with paired-end data.
 FASTQ_SUFFIX_2=_r_paired_trim.fastq.gz # Suffix to trimmed fastq files. Use reverse reads with paired-end data.
 REFDIR=/cm/shared/courses/dbarshis/barshislab/jtoy/references/
