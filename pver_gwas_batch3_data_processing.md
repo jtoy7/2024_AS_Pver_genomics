@@ -3603,10 +3603,16 @@ Using a threshold relatedness (PHI) value of 0.42, 1090 comparisons are identifi
 library(igraph)
 
 # Create graph
-g <- graph_from_data_frame(clones[, c("Sample1", "Sample2")], directed = FALSE)
+g <- graph_from_data_frame(clones[, c("Sample1", "Sample2", "RELATEDNESS_PHI")], directed = FALSE)
+
+# Rename weight
+E(g)$weight <- clones$RELATEDNESS_PHI
+
+# Tell layout to use weights (affects edge length)
+layout_fr <- layout_with_fr(g, weights = E(g)$weight)
 
 # Plot graph
-plot(g, vertex.label = NA, vertex.size = 3, edge.color = "gray80", main = "Clone Groups")
+plot(g, vertex.label = NA, vertex.size = 3, edge.color = "gray80", layout = layout_fr, main = "Clone Groups")
 
 # Get connected components (i.e., clone groups)
 components <- components(g)
@@ -3655,6 +3661,7 @@ plot(g,
      vertex.label.cex = 0.4,
      vertex.size = 3,
      edge.color = "gray80",
+     layout = layout_fr,
      main = "Clone Groups Colored by Collection Site")
 legend("topright", legend = names(location_colors),
        col = location_colors, pch = 19, pt.cex = 1.5, cex = 0.6, bty = "n",
@@ -3666,6 +3673,104 @@ There are a total of 69 different clone groups. The most frequent group size is 
 ![alt text](image-12.png)
 
 ```r
+# To cluster the groups by Location in the plot, switch to using ggraph/tidygraph
+library(ggraph)
+library(tidygraph)
+
+# Find dominant Location per clone group
+dominant_locations <- sample_metadata %>%
+  group_by(CloneGroup, Location) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(CloneGroup) %>%
+  slice_max(order_by = count, n = 1, with_ties = FALSE) %>%  # defines dominant location per group by picking row with highest count
+  ungroup() %>%
+  select(CloneGroup, DominantLocation = Location)
+
+# Join dominant location back to sample_metadata
+sample_metadata_domloc <- sample_metadata %>%
+  left_join(dominant_locations, by = "CloneGroup")
+
+# convert igraph format to tidygraph format
+tg <- as_tbl_graph(g)
+
+# Join metadata on node names
+tg <- tg %>% 
+  activate(nodes) %>% 
+  left_join(sample_metadata_domloc, by = c("name" = "Sample"))
+
+
+# Groups together
+ggraph(tg, layout = "fr") +  # Fruchterman-Reingold force-directed layout
+  geom_edge_link(color = "gray80", alpha = 0.6) +
+  geom_node_point(aes(color = Location), size = 3) +
+  #geom_node_text(aes(label = name), repel = TRUE, size = 2, check_overlap = TRUE) +
+  scale_color_manual(values = mypal2) +
+  theme_graph() +
+  labs(title = "Clone Groups Colored by Collection Site",
+       color = "Collection Site")
+
+# Groups faceted
+ggraph(tg, layout = "fr") +  # Fruchterman-Reingold force-directed layout
+  geom_edge_link(color = "gray80", alpha = 0.6) +
+  geom_node_point(aes(color = Location), size = 3) +
+  geom_node_text(aes(label = name), repel = TRUE, size = 2, check_overlap = TRUE) +
+  scale_color_manual(values = mypal2) +
+  facet_wrap(~ DominantLocation, scales = "free") +
+  theme_graph() +
+  labs(title = "Clone Groups Colored by Collection Site",
+       color = "Collection Site")
+
+
+
+# Ordered by DominantLocation
+
+# Calculate layout coordinates with edge weights
+coords <- create_layout(tg, layout = "fr", weights = weight)
+
+# Extract node metadata
+node_meta <- as_tibble(tg, active = "nodes") %>%
+  select(name, CloneGroup, DominantLocation)
+
+# Join node metadata to layout coordinates (by 'name')
+coords <- coords %>%
+  left_join(node_meta, by = "name")
+
+# For each dominant location, assign a "group offset" to shift all nodes in groups of that dominant location
+# We'll arrange dominant locations and assign numeric offsets
+location_levels <- unique(coords$DominantLocation.x)
+location_offsets <- setNames(seq_along(location_levels) * 10, location_levels)  # multiply by 10 for spacing
+
+# Compute offsets per node based on dominant location's offset
+coords <- coords %>%
+  mutate(
+    x = x + location_offsets[DominantLocation.x],  # shift x by dominant location
+    y = y  # keep y as is, or you can tweak similarly if you want vertical grouping
+  )
+
+# Plot with ggraph, using modified coordinates
+ggraph(coords) +
+  geom_edge_link(aes(x = x, y = y, xend = xend, yend = yend, width = weight), color = "gray80", alpha = 0.6) +
+  geom_node_point(aes(x = x, y = y, color = Location), size = 3, alpha = 0.5) +
+  #geom_node_text(aes(x = x, y = y, label = name), repel = TRUE, size = 2, check_overlap = TRUE) +
+  scale_color_manual(values = mypal2) +
+  theme_graph() +
+  labs(title = "Clone Groups Colored by Dominant Location with Grouped Layout")
+
+
+
+
+# Subgraphs by DominantLocation
+ggraph(tg %>% filter(DominantLocation == "FASA"), layout = "fr") +  # Fruchterman-Reingold force-directed layout
+  geom_edge_link(color = "gray80", alpha = 0.6) +
+  geom_node_point(aes(color = Location), size = 3) +
+  geom_node_text(aes(label = name), repel = TRUE, size = 2, check_overlap = TRUE) +
+  scale_color_manual(values = mypal2[c(4, 10)]) +
+  theme_graph() +
+  labs(title = "Clone Groups Colored by Collection Site",
+       color = "Collection Site")
+
+
+
 # Create separate plots by DominantLocation subgroup then stitch together
 # create a named vector from mypal vector
 mypal2_named <- mypal2
@@ -3679,8 +3784,8 @@ plot_dominant_location <- function(tg, location, mypal2) {
     filter(DominantLocation == location) %>% 
     mutate(Location = factor(Location, levels = location_levels))  # force levels here
   
-  # Compute layout for subset graph
-  coords <- create_layout(subgraph, layout = "fr")
+  # Compute layout for subset graph WITH WEIGHTS for edge lengths (higher relatedness = nodes pulled closer together)
+  coords <- create_layout(subgraph, layout = "fr", weights = weight)
   
   # Plot with points colored by Location (consistent palette)
   ggraph(coords) +
@@ -3709,7 +3814,8 @@ plots <- lapply(dominant_locations, function(loc) {
 library(patchwork)
 wrap_plots(plots, ncol = 4)
 ```
-![alt text](image-13.png)
+
+![alt text](image-14.png)
 Technical replicates depicted as loops (FALU, FASA, LEON, OFU6)
 
 ```r
