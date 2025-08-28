@@ -3893,6 +3893,9 @@ summary_by_location
 | OFU6     | 40            | 0          | 40            | 8                 | 8                      |
 | FMAL     | 1             | 1          | 0             | 0                 | 1                      |
 
+Full script can be found at `plot_PCA_pver_all_samples_clean.R`
+
+
 
 
 
