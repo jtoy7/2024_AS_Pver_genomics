@@ -3581,19 +3581,35 @@ ggplot(relatedness2 %>% filter(RELATEDNESS_PHI > 0), aes(x = RELATEDNESS_PHI)) +
 
 
 
+# Pull out comparisons of technical replicates
 techreps <- relatedness2 %>% filter(Sample1 == Sample2)
-# Comparisons between the 4 samples with technical replicates have RELATEDNESS_PHI values of > 0.494. 
+    # Comparisons between the 4 samples with technical replicates have RELATEDNESS_PHI values of > 0.494. 
 
+# Pull out comparisons that identify clonal relationships
 clones <- relatedness2 %>% filter(RELATEDNESS_PHI >= 0.42)
-# But the PI_HAT values for other comparisons are high, indicating clones. Peak in distribution mostly ends around 0.48. Three comparisons had relatedness less than 0.48 but greater than 0.42. This threshold of 0.42 identifies 1090 comparisons!
+    # But the PI_HAT values for other comparisons are high, indicating clones. Peak in distribution mostly ends around 0.48. Three comparisons had relatedness less than 0.48 but greater than 0.42. Using this threshold identifies 1090 comparisons!
 
-c(clones$Sample1, clones$Sample2) %>% unique() %>% length()
-# ...corresponding to 312 unique samples (that have at least one clone)!
+# Make list of all clonal samples (including "Extra" samples)
+clone_list <- c(clones$Sample1, clones$Sample2) %>% unique()
+length(clone_list)
+    # ...corresponding to 312 unique samples (that have at least one clone)! Two of these are AOAA_Pspp_Extra1 and AOAA_Pspp_Extra2 (but they are not clones of each other)
+
+# Make list of ALL samples (not including technical replicates, or AOAA_Pver_03)
+all_samples <- c(relatedness2$Sample1, relatedness2$Sample2) %>% unique()
+    # 392 samples (no technical replicates, and no AOAA_Pver_03)
+
+# Make list of singleton samples (samples with no clones in the data set; includes "Extra" samples)
+singletons <- all_samples[!all_samples %in% clone_list]
+    # 80 singleton lineages! (including Extras)
+
+# Make list of singleton samples that were used in CBASS experiments (i.e., exclude any "Extra" samples)
+singletons_noX <- singletons[grepl("Pver", singletons)]
+    # 69 singleton lineages!
 ```
 ![alt text](image-1.png)
 Peak near zero is good (most comparisons are unrelated). Concentrated small peak near 0.5 represents clones/replicates. Negative peaks represent comparisons that are less similar than expected based on population allele frequencies, which is what you would expect when different cryptic species are included.
 
-Using a threshold relatedness (PHI) value of 0.42, 1090 comparisons are identified as clonal, corresponding to **312 unique samples with at least one clone** (including technical replicates; 308 excluding them). Excluding the 4 replicate sample, there are 392 total samples. This leaves **84 singleton samples with no clones** in the dataset. 84 singletons + 69 clone groups = **153 unique genotypes** in the dataset.
+Using a threshold relatedness (PHI) value of 0.42, 1090 comparisons are identified as clonal, corresponding to **312 unique samples with at least one clone** (excluding technical replicates). Excluding the 4 replicate samples and the AOAA_Pver_03 sample that failed in library prep, there are 392 total samples (379 CBASS samples + 13 "Extras"). This leaves **80 singleton samples with no clones** in the dataset (including "Extras"). Removing "Extra" samples leaves **69 singleton samples that were CBASSed**. 69 singletons + 69 clone groups = **138 unique lineages** in the dataset.
 
 <br>
 
