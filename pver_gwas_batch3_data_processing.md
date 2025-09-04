@@ -3690,14 +3690,15 @@ clone_pruned <- all_groups %>%
   # if still multiple samples (tie or multiple samples in modal location), pick one randomly
   slice_sample(n = 1) %>%
   ungroup() %>%
-  select(Sample, Clone_Group, Location, Species)
+  mutate(Sample_Fullname = paste0(Sample,"_1")) %>%       # add back the rep number to match full sample name in PLINK/VCF files
+  select(Sample_Fullname, Sample, Clone_Group, Location, Species)
 
 # write to file
 write_tsv(clone_pruned, file = "clone_group_mapping_table_pruned.tsv")
 
 # create PLINK formatted clone-pruned sample list for filtering data set (FID IID)
 keep_df <- clone_pruned %>% 
-  mutate(FID = Sample, IID = Sample, .keep = "none")
+  mutate(FID = "0", IID = Sample_Fullname, .keep = "none")
 
 write_tsv(keep_df, file = "keep_samples.txt", col_names = FALSE)
 
@@ -3967,7 +3968,7 @@ Full script can be found at `plot_PCA_pver_all_samples_clean.R`
 ## Rerun Admixture/ancestry analysis with clone-pruned sample list
 ### Using ADMIXTURE v1.3.0
 
-First need to convert PLINK2 files to PLINK1 .bed format:
+First need to convert PLINK2 files to PLINK1 .bed format (if not done already; this should have already been done in order to calculate PI_HAT with PLINK1 earlier):
 ```bash
 crun.plink plink2 \
   --pfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
@@ -3977,6 +3978,7 @@ crun.plink plink2 \
 
 ### Run ADMIXTURE with cross-validation for K=1-10 across 3 replicate runs
 Make lookup table for value of K and replicate number for each planned run (if not already done):
+`k_rep_table.txt`:
 ```
 1       1
 1       2
@@ -4023,14 +4025,15 @@ mv admixture.bim pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.bim
 Now filter the PLINK files based on the clone-pruned sample list:
 ```bash
 # create a subset bed/bim/fam with PLINK
-plink --bfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
+crun.plink plink --bfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
       --keep keep_samples.txt \
       --make-bed \
-      --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned
+      --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned \
+      --allow-extra-chr
 ```
 
 Run ADMIXTURE:
-`admixture_array.slurm`
+`admixture_array_pver_clonepruned.slurm`
 ```bash
 #!/bin/bash
 #SBATCH --job-name=admixture_array_pver_clonepruned_2025-09-04
@@ -4051,10 +4054,11 @@ module load container_env admixture/1.3
 
 # Set working directory
 BASEDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/
-cd $BASEDIR/admixture
+mkdir -p $BASEDIR/admixture/clone_pruned
+cd $BASEDIR/admixture/clone_pruned
 
 # Define max K and replicates
-LINE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $BASEDIR/admixture/k_rep_table.txt)    # pulls out line from lookup table
+LINE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $BASEDIR/admixture/clone_pruned/k_rep_table.txt)    # pulls out line from lookup table
 read K REP <<< "$LINE"                                                         # uses the "here string" bash operator to provide a string as input to a command as if it came from stdin
                                                                                # "read" splits the string by whitespace and assigns each part to the variables "K" and "REP"
 
