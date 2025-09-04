@@ -3652,6 +3652,58 @@ ggplot(group_sizes, aes(x = group_size)) +
   # Most frequent group size is 2. Largest is 18 (2 groups). 51 of the 69 groups have a size of 4 or less.
 
 
+
+## Create final clone group mapping table
+# Convert components named vector to clone groups table
+clone_groups <- enframe(components$membership, name = "Sample", value = "Clone_Group")
+
+# Get last clone group ID
+max_group <- max(clone_groups$Clone_Group)
+
+# Create a table for singletons
+singleton_groups <- tibble(
+  Sample = singletons,
+  Clone_Group = seq(from = max_group + 1, length.out = length(singletons))
+)
+
+# Combine tables
+all_groups <- bind_rows(clone_groups, singleton_groups) %>% arrange(Clone_Group)
+
+# Export table as tsv
+write_tsv(all_groups, file = "clone_group_mapping_table.tsv")
+
+
+
+
+## Create subset sample list keeping only one random individual per clone group
+set.seed(123)   # for reproducibility
+clone_pruned <- all_groups %>%
+  separate(Sample, into = c("Year", "Location", "Species", "Genotype"), sep = "_", remove = FALSE) %>% 
+  group_by(Clone_Group, Location) %>%
+  mutate(n_loc = n()) %>%            # count per location in each clone group
+  ungroup() %>%
+  group_by(Clone_Group) %>%
+  # keep only rows whose location count equals the max count for that Clone_Group
+  filter(n_loc == max(n_loc, na.rm = TRUE)) %>%
+  # Prefer Pver over Pspp
+  filter(Species == "Pver" | !("Pver" %in% Species)) %>%
+  # if still multiple samples (tie or multiple samples in modal location), pick one randomly
+  slice_sample(n = 1) %>%
+  ungroup() %>%
+  select(Sample, Clone_Group, Location, Species)
+
+# write to file
+write_tsv(clone_pruned, file = "clone_group_mapping_table_pruned.tsv")
+
+# create PLINK formatted clone-pruned sample list for filtering data set (FID IID)
+keep_df <- clone_pruned %>% 
+  mutate(FID = Sample, IID = Sample, .keep = "none")
+
+write_tsv(keep_df, file = "keep_samples.txt", col_names = FALSE)
+
+
+
+
 # Extract all unique sample names from your graph and split names into metadata
 sample_metadata <- V(g)$name %>% 
   as.tibble() %>% 
@@ -3910,6 +3962,169 @@ summary_by_location
 | FMAL     | 1             | 1          | 0             | 0                 | 1                      |
 
 Full script can be found at `plot_PCA_pver_all_samples_clean.R`
+
+
+## Rerun Admixture/ancestry analysis with clone-pruned sample list
+### Using ADMIXTURE v1.3.0
+
+First need to convert PLINK2 files to PLINK1 .bed format:
+```bash
+crun.plink plink2 \
+  --pfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
+  --make-bed \
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes
+```
+
+### Run ADMIXTURE with cross-validation for K=1-10 across 3 replicate runs
+Make lookup table for value of K and replicate number for each planned run (if not already done):
+```
+1       1
+1       2
+1       3
+2       1
+2       2
+2       3
+3       1
+3       2
+3       3
+4       1
+4       2
+4       3
+5       1
+5       2
+5       3
+6       1
+6       2
+6       3
+7       1
+7       2
+7       3
+8       1
+8       2
+8       3
+9       1
+9       2
+9       3
+10      1
+10      2
+10      3
+```
+
+Next, chromosome/scaffold names need to be changed in the .bim file becuase ADMIXTURE only allows them to be strings of numbers:
+```bash
+# create new bim file with altered chromosome names
+sed -E 's/N[A-Z]_([0-9]+)\.1_Pverrucosa/\1/g' pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.bim > admixture.bim
+
+# backup original bim and replace with new bim file
+mv pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.bim pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_original.bim
+mv admixture.bim pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes.bim
+```
+
+Now filter the PLINK files based on the clone-pruned sample list:
+```bash
+# create a subset bed/bim/fam with PLINK
+plink --bfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
+      --keep keep_samples.txt \
+      --make-bed \
+      --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned
+```
+
+Run ADMIXTURE:
+`admixture_array.slurm`
+```bash
+#!/bin/bash
+#SBATCH --job-name=admixture_array_pver_clonepruned_2025-09-04
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-30%30     # 10 K values * 3 replicates each = 30 tasks
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=30G
+#SBATCH --time=5-00:00:00
+
+# Load modules
+module load container_env admixture/1.3
+
+
+# Set working directory
+BASEDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/
+cd $BASEDIR/admixture
+
+# Define max K and replicates
+LINE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $BASEDIR/admixture/k_rep_table.txt)    # pulls out line from lookup table
+read K REP <<< "$LINE"                                                         # uses the "here string" bash operator to provide a string as input to a command as if it came from stdin
+                                                                               # "read" splits the string by whitespace and assigns each part to the variables "K" and "REP"
+
+# Print info for logging
+echo "Running ADMIXTURE for K=${K}, Replicate=${REP}, Task ID=${SLURM_ARRAY_TASK_ID}"
+
+# Define input file
+INPUT=$BASEDIR/vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned.bed
+
+# Output prefix (can help organize results)
+OUTPUT_PREFIX="admixture_K${K}_rep${REP}"
+
+
+# Run ADMIXTURE with 8 threads
+crun.admixture admixture --seed=$SLURM_ARRAY_TASK_ID --cv=10 -j8 $INPUT $K > ${OUTPUT_PREFIX}.log 2>&1
+
+
+# Rename output files to avoid overwriting
+mv pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned.${K}.Q ${OUTPUT_PREFIX}.Q
+mv pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned.${K}.P ${OUTPUT_PREFIX}.P
+
+echo "Run $OUTPUT_PREFIX completed."
+```
+
+Compile cross-validation error results and log-likelihood across runs:
+```bash
+for FILE in admixture_K*_rep*.log; do
+  K=$(echo $FILE | grep -oP 'K\d+')
+  REP=$(echo $FILE | grep -oP 'rep\d+')
+  CVERR=$(grep "CV error" $FILE | awk -F": " '{print $2}')
+  LOGLIK=$(grep -oP 'Loglikelihood:\s+\K-?(.\d+\.?\d+?)$' "$FILE")
+  echo -e "$K\t$REP\t$CVERR\t$LOGLIK"
+done > cv_loglik_summary.tsv
+```
+
+Plot cross validation error to look for best K:
+`plot_admixture_results.R`
+```r
+# Ancestry analysis with ADMIXTURE - Pver all samples
+# 2025-07-14
+# Jason A. Toy
+
+rm(list = ls())
+
+library(tidyverse)
+
+
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/admixture")
+
+
+# load cross validation errors for all runs (3 runs x 10 K values)
+cv <- read_tsv("cv_summary.tsv", col_names = c("K", "Rep", "CV_Error")) %>%
+  mutate(K = str_remove(K, "K") %>% as.numeric(),
+         Rep = str_remove(Rep, "rep") %>% as.numeric)
+
+# calculate mean and sd
+cvsum <- cv %>% group_by(K) %>% summarize(Mean_CV = mean(CV_Error), SD = sd(CV_Error))
+
+# plot CV Error vs. K
+ggplot(cvsum, aes(x = K, y = Mean_CV)) +
+  geom_line(color = "deepskyblue3", linewidth = 1) +
+  geom_point(size = 2, color = "deepskyblue3") +
+  geom_errorbar(aes(ymin = Mean_CV - SD, ymax = Mean_CV + SD), width = 0.1, color = "gray50") +
+  scale_x_continuous(breaks = cvsum$K) +
+  labs(title = "ADMIXTURE CV Error by K",
+       x = "Number of Ancestral Populations (K)",
+       y = "Mean CV Error ± SD") +
+  theme_bw(base_size = 14)
+```
+
 
 
 
