@@ -4095,10 +4095,10 @@ done > cv_loglik_summary.tsv
 ```
 
 Plot cross validation error to look for best K:
-`plot_admixture_results.R`
+`plot_admixture_results_clonepruned.R`
 ```r
-# Ancestry analysis with ADMIXTURE - Pver all samples
-# 2025-07-14
+# Ancestry analysis with ADMIXTURE - Pver clone-pruned sample list
+# 2025-09-05
 # Jason A. Toy
 
 rm(list = ls())
@@ -4106,28 +4106,256 @@ rm(list = ls())
 library(tidyverse)
 
 
-setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/admixture")
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/admixture/clone_pruned/")
 
 
 # load cross validation errors for all runs (3 runs x 10 K values)
-cv <- read_tsv("cv_summary.tsv", col_names = c("K", "Rep", "CV_Error")) %>%
+cv <- read_table("cv_loglik_summary.tsv", col_names = c("K", "Rep", "CV_Error", "LogLik")) %>%
   mutate(K = str_remove(K, "K") %>% as.numeric(),
          Rep = str_remove(Rep, "rep") %>% as.numeric)
 
 # calculate mean and sd
-cvsum <- cv %>% group_by(K) %>% summarize(Mean_CV = mean(CV_Error), SD = sd(CV_Error))
+cvsum <- cv %>% 
+  group_by(K) %>% 
+  summarize(Mean_CV = mean(CV_Error),
+            SD_CV = sd(CV_Error),
+            Mean_LogLik = mean(LogLik),
+            SD_LogLik = sd(LogLik))
 
 # plot CV Error vs. K
 ggplot(cvsum, aes(x = K, y = Mean_CV)) +
   geom_line(color = "deepskyblue3", linewidth = 1) +
   geom_point(size = 2, color = "deepskyblue3") +
-  geom_errorbar(aes(ymin = Mean_CV - SD, ymax = Mean_CV + SD), width = 0.1, color = "gray50") +
+  geom_errorbar(aes(ymin = Mean_CV - SD_CV, ymax = Mean_CV + SD_CV), width = 0.1, color = "gray50") +
   scale_x_continuous(breaks = cvsum$K) +
   labs(title = "ADMIXTURE CV Error by K",
        x = "Number of Ancestral Populations (K)",
        y = "Mean CV Error ± SD") +
   theme_bw(base_size = 14)
+# Lowest CV error at K=4
 ```
+![alt text](<Screenshot 2025-09-05 140935.png>)
+<br>
+
+
+Plot Evanno method (delta K)
+```r
+# Compute ΔK using the Evanno method
+evanno <- cvsum %>%
+  mutate(
+    Lnext = lead(Mean_LogLik),             # L(K+1)
+    Lprev = lag(Mean_LogLik),              # L(K-1)
+    diff2 = abs(Lnext - 2 * Mean_LogLik + Lprev), # L"(K)
+    DeltaK = diff2 / SD_LogLik
+  )
+
+# Plot L vs K
+evannop1 <- ggplot(evanno, aes(x = K, y = Mean_LogLik)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Evanno Method",
+       x = "Number of clusters (K)",
+       y = "L") +
+  scale_x_continuous(breaks = unique(evanno$K))
+evannop1
+
+# Plot L' vs K
+evannop2 <- ggplot(evanno, aes(x = K, y = Mean_LogLik - Lprev)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Evanno Method",
+       x = "Number of clusters (K)",
+       y = expression("L'")) +
+  scale_x_continuous(breaks = unique(evanno$K))
+evannop2
+
+# Plot L" vs K
+evannop3 <- ggplot(evanno, aes(x = K, y = diff2)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Evanno Method",
+       x = "Number of clusters (K)",
+       y = expression("L\"")) +
+  scale_x_continuous(breaks = unique(evanno$K))
+evannop3
+# After K=2, largest L" occurs at K=6
+
+
+# Plot ΔK vs K
+evannop4 <- ggplot(evanno, aes(x = K, y = DeltaK)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Evanno Method",
+       x = "Number of clusters (K)",
+       y = expression(Delta*K)) +
+  scale_x_continuous(breaks = unique(evanno$K))
+evannop4
+# Largest ΔK occurs at K=2
+
+library(cowplot)
+plot_grid(evannop1, evannop2, evannop3, evannop4, ncol = 2)
+```
+![alt text](<Screenshot 2025-09-05 140859.png>)
+<br>
+
+
+Plot ADMIXTURE proportions
+```r
+# Plot admixture proportions for various K
+# Set K and replicate
+K <- 8
+rep <- 1
+
+# Read the Q matrix
+q <- read_table(paste0("admixture_K", K, "_rep", rep, ".Q"), col_names = FALSE)
+
+# Add individual IDs (in order from .fam file)
+ids <- read_table("../../vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned.fam", col_names = FALSE) %>% pull(2)
+
+# Add IDs and convert to long format
+qlong <- q %>%
+  mutate(Individual = ids) %>%
+  pivot_longer(-Individual, names_to = "Cluster", values_to = "Ancestry") %>%
+  mutate(Cluster = str_replace(Cluster, "X", "P") %>% as.factor()) %>% 
+  separate(Individual, into = c("Year", "Location", "Species", "Genotype", "TechRep"), sep = "_", remove = FALSE)
+
+# Summarize each individual's dominant cluster and max ancestry for plot ordering
+ordering <- qlong %>%
+  group_by(Individual) %>%
+  summarize(
+    DominantCluster = Cluster[which.max(Ancestry)],
+    MaxAncestry = max(Ancestry)
+  ) %>%
+  arrange(DominantCluster, MaxAncestry, Individual)
+
+# Factor the Cluster and Individual columns for proper ordering
+qlong$Individual <- factor(qlong$Individual, levels = ordering$Individual)
+qlong$Cluster <- factor(qlong$Cluster, levels = paste0("P", 1:K))
+
+k8plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+        axis.ticks.x = element_blank()) +
+  labs(title = paste("ADMIXTURE results (K =", K, ", Rep =", rep, ")"),
+       x = "Individuals", y = "Ancestry Proportion")
+
+
+
+# combo plot
+library(cowplot)
+plot_grid(k2plot, k3plot, k4plot, k5plot, ncol = 1)
+plot_grid(k6plot, k7plot, k8plot, ncol = 1)
+```
+![alt text](<Screenshot 2025-09-05 140145.png>)
+![alt text](<Screenshot 2025-09-05 140219.png>)
+<br>
+
+
+
+### Rerun again with the 9 non-P.acuta samples removed
+Make list of samples to remove:
+`non_Pacuta_samples.txt`
+```
+ALOF_Pspp_X2_1
+ALOF_Pver_01_1
+AOAA_Pspp_X7_1
+FASA_Pspp_X3_1
+FASA_Pspp_X4_1
+FMAL_Pspp_X1_1
+FTEL_Pspp_X4_1
+MALO_Pver_21_1
+VATI_Pver_18_1
+```
+
+Then make new version of `keep_samples.txt` called `keep_samples_Pacuta_only.txt`:
+```bash
+grep -v -f non_Pacuta_samples.txt keep_samples.txt > keep_samples_Pacuta_only.txt
+```
+
+Now filter the PLINK files again based on the clone-pruned, P.acuta-only sample list:
+```bash
+# create a subset bed/bim/fam with PLINK
+crun.plink plink --bfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned \
+      --keep keep_samples_Pacuta_only.txt \
+      --make-bed \
+      --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only \
+      --allow-extra-chr
+```
+
+
+Run ADMIXTURE again with new clone-pruned, P.acuta only data set:
+`admixture_array_pver_clonepruned_Pacutaonly.slurm`
+```bash
+#!/bin/bash
+#SBATCH --job-name=admixture_array_pver_clonepruned_Pacutaonly_2025-09-05
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-30%30     # 10 K values * 3 replicates each = 30 tasks
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=30G
+#SBATCH --time=5-00:00:00
+
+# Load modules
+module load container_env admixture/1.3
+
+
+# Set working directory
+BASEDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/
+mkdir -p $BASEDIR/admixture/clone_pruned_Pacuta_only
+cd $BASEDIR/admixture/clone_pruned_Pacuta_only
+
+# Define max K and replicates
+LINE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $BASEDIR/admixture/clone_pruned_Pacuta_only/k_rep_table.txt)    # pulls out line from lookup table
+read K REP <<< "$LINE"                                                         # uses the "here string" bash operator to provide a string as input to a command as if it came from stdin
+                                                                               # "read" splits the string by whitespace and assigns each part to the variables "K" and "REP"
+
+# Print info for logging
+echo "Running ADMIXTURE for K=${K}, Replicate=${REP}, Task ID=${SLURM_ARRAY_TASK_ID}"
+
+# Define input file
+INPUT=$BASEDIR/vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.bed
+
+# Output prefix (can help organize results)
+OUTPUT_PREFIX="admixture_K${K}_rep${REP}"
+
+
+# Run ADMIXTURE with 8 threads
+crun.admixture admixture --seed=$SLURM_ARRAY_TASK_ID --cv=10 -j8 $INPUT $K > ${OUTPUT_PREFIX}.log 2>&1
+
+
+# Rename output files to avoid overwriting
+mv pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.${K}.Q ${OUTPUT_PREFIX}.Q
+mv pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.${K}.P ${OUTPUT_PREFIX}.P
+
+echo "Run $OUTPUT_PREFIX completed."
+```
+
+Compile cross-validation error results and log-likelihood across runs:
+```bash
+for FILE in admixture_K*_rep*.log; do
+  K=$(echo $FILE | grep -oP 'K\d+')
+  REP=$(echo $FILE | grep -oP 'rep\d+')
+  CVERR=$(grep "CV error" $FILE | awk -F": " '{print $2}')
+  LOGLIK=$(grep -oP 'Loglikelihood:\s+\K-?(.\d+\.?\d+?)$' "$FILE")
+  echo -e "$K\t$REP\t$CVERR\t$LOGLIK"
+done > cv_loglik_summary.tsv
+```
+
+Plot cross validation error to look for best K:
+`plot_admixture_results_clonepruned_Pacutaonly.R`
+```r
+
+```
+
 
 
 
