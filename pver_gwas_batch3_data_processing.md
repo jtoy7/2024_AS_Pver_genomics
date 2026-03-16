@@ -4382,10 +4382,9 @@ ggplot(cvsum, aes(x = K, y = Mean_CV)) +
        x = "Number of Ancestral Populations (K)",
        y = "Mean CV Error ± SD") +
   theme_bw(base_size = 14)
-
-# Lowest CV error at K=3
 ```
 <img width="2387" height="1552" alt="image" src="https://github.com/user-attachments/assets/49d138d7-a51f-43ad-88bb-da90c937005e" />
+Lowest CV error at K=3.
 
 <br>
 <br>
@@ -4445,17 +4444,17 @@ evannop4 <- ggplot(evanno, aes(x = K, y = DeltaK)) +
        y = expression(Delta*K)) +
   scale_x_continuous(breaks = unique(evanno$K))
 evannop4
-# Largest ΔK occurs at K=2
 
 library(cowplot)
 plot_grid(evannop1, evannop2, evannop3, evannop4, ncol = 2)
 ```
 <img width="2387" height="1552" alt="image" src="https://github.com/user-attachments/assets/16e8efa7-00fc-4dd1-91f4-17386f5b7f23" />
+Largest ΔK occurs at K=2.
 
 <br>
 <br>
 
-Plot admixture proportions for various K
+Plot admixture proportions for various K:
 ```r
 # Set K and replicate to visualize
 K <- 2
@@ -4503,7 +4502,7 @@ k2plot
 <br>
 <br>
 
-K=3
+Now K=3:
 ```r
 K <- 3
 rep <- 1
@@ -4550,8 +4549,267 @@ k3plot
 
 <img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/4cb3f85f-3eb5-4206-a554-f648a519ba29" />
 
+<br>
+<br>
+
+Now K=4:
+```r
+K <- 4
+rep <- 1
+
+# Read the Q matrix
+q <- read_table(paste0("admixture_K", K, "_rep", rep, ".Q"), col_names = FALSE)
+
+# Add individual IDs (in order from .fam file)
+ids <- read_table("../../vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.fam", col_names = FALSE) %>% pull(2)
 
 
+# Add IDs and convert to long format
+qlong <- q %>%
+  mutate(Individual = ids) %>%
+  pivot_longer(-Individual, names_to = "Cluster", values_to = "Ancestry") %>%
+  mutate(Cluster = str_replace(Cluster, "X", "P") %>% as.factor()) %>% 
+  separate(Individual, into = c("Year", "Location", "Species", "Genotype", "TechRep"), sep = "_", remove = FALSE)
+
+
+# ---- Ordered by hierarchical clustering ---
+# Assign rownames for clustering
+qmat <- as.matrix(q)
+rownames(qmat) <- ids
+
+# Use hierarchical clustering on Q matrix to order samples in plot
+hc <- hclust(dist(qmat), method = "ward.D2")
+ordering <- hc$labels[hc$order]
+
+# Factor the Cluster and Individual columns for proper ordering
+qlong$Individual <- factor(qlong$Individual, levels = ordering)
+qlong$Cluster <- factor(qlong$Cluster, levels = paste0("P", 1:K))
+
+
+# Plot
+k4plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_futurama() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+        axis.ticks.x = element_blank()) +
+  labs(title = paste("ADMIXTURE results (K =", K, ", Rep =", rep, ")"),
+       x = "Individuals", y = "Ancestry Proportion")
+k4plot
+```
+<img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/f7dd4367-3440-4c2e-95ab-f7b782e80af5" />
+
+<br>
+<br>
+
+Now K=5:
+```r
+K <- 5
+rep <- 1
+
+# Read the Q matrix
+q <- read_table(paste0("admixture_K", K, "_rep", rep, ".Q"), col_names = FALSE)
+
+# Add individual IDs (in order from .fam file)
+ids <- read_table("../../vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.fam", col_names = FALSE) %>% pull(2)
+
+
+# Add IDs and convert to long format
+qlong <- q %>%
+  mutate(Individual = ids) %>%
+  pivot_longer(-Individual, names_to = "Cluster", values_to = "Ancestry") %>%
+  mutate(Cluster = str_replace(Cluster, "X", "P") %>% as.factor()) %>% 
+  separate(Individual, into = c("Year", "Location", "Species", "Genotype", "TechRep"), sep = "_", remove = FALSE)
+
+
+# ---- Ordered by hierarchical clustering ---
+# Assign rownames for clustering
+qmat <- as.matrix(q)
+rownames(qmat) <- ids
+
+# Use hierarchical clustering on Q matrix to order samples in plot
+hc <- hclust(dist(qmat), method = "ward.D2")
+ordering <- hc$labels[hc$order]
+
+# Factor the Cluster and Individual columns for proper ordering
+qlong$Individual <- factor(qlong$Individual, levels = ordering)
+qlong$Cluster <- factor(qlong$Cluster, levels = paste0("P", 1:K))
+
+
+# Plot
+k5plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = c("#C71000FF", "#FF95A8FF", "#FF6F00FF", "#8A4198FF", "#008EA0FF")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+        axis.ticks.x = element_blank()) +
+  labs(title = paste("ADMIXTURE results (K =", K, ", Rep =", rep, ")"),
+       x = "Individuals", y = "Ancestry Proportion")
+k5plot
+```
+<img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/cf690a1a-cde0-4015-9546-9939a5551dea" />
+
+<br>
+<br>
+
+Now K=6:
+```r
+K <- 6
+rep <- 1
+
+# Read the Q matrix
+q <- read_table(paste0("admixture_K", K, "_rep", rep, ".Q"), col_names = FALSE)
+
+# Add individual IDs (in order from .fam file)
+ids <- read_table("../../vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.fam", col_names = FALSE) %>% pull(2)
+
+
+# Add IDs and convert to long format
+qlong <- q %>%
+  mutate(Individual = ids) %>%
+  pivot_longer(-Individual, names_to = "Cluster", values_to = "Ancestry") %>%
+  mutate(Cluster = str_replace(Cluster, "X", "P") %>% as.factor()) %>% 
+  separate(Individual, into = c("Year", "Location", "Species", "Genotype", "TechRep"), sep = "_", remove = FALSE)
+
+
+# ---- Ordered by hierarchical clustering ---
+# Assign rownames for clustering
+qmat <- as.matrix(q)
+rownames(qmat) <- ids
+
+# Use hierarchical clustering on Q matrix to order samples in plot
+hc <- hclust(dist(qmat), method = "ward.D2")
+ordering <- hc$labels[hc$order]
+
+# Factor the Cluster and Individual columns for proper ordering
+qlong$Individual <- factor(qlong$Individual, levels = ordering)
+qlong$Cluster <- factor(qlong$Cluster, levels = paste0("P", 1:K))
+
+
+# Plot
+k6plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = c("#8A4198FF", "#ADE2D0FF", "#C71000FF", "#FF95A8FF", "#008EA0FF", "#FF6F00FF")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+        axis.ticks.x = element_blank()) +
+  labs(title = paste("ADMIXTURE results (K =", K, ", Rep =", rep, ")"),
+       x = "Individuals", y = "Ancestry Proportion")
+k6plot
+```
+<img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/075e7b48-fcdd-44d4-b8b2-447bfae331e5" />
+
+<br>
+<br>
+
+Now K=7:
+```r
+K <- 7
+rep <- 1
+
+# Read the Q matrix
+q <- read_table(paste0("admixture_K", K, "_rep", rep, ".Q"), col_names = FALSE)
+
+# Add individual IDs (in order from .fam file)
+ids <- read_table("../../vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.fam", col_names = FALSE) %>% pull(2)
+
+
+# Add IDs and convert to long format
+qlong <- q %>%
+  mutate(Individual = ids) %>%
+  pivot_longer(-Individual, names_to = "Cluster", values_to = "Ancestry") %>%
+  mutate(Cluster = str_replace(Cluster, "X", "P") %>% as.factor()) %>% 
+  separate(Individual, into = c("Year", "Location", "Species", "Genotype", "TechRep"), sep = "_", remove = FALSE)
+
+
+# ---- Ordered by hierarchical clustering ---
+# Assign rownames for clustering
+qmat <- as.matrix(q)
+rownames(qmat) <- ids
+
+# Use hierarchical clustering on Q matrix to order samples in plot
+hc <- hclust(dist(qmat), method = "ward.D2")
+ordering <- hc$labels[hc$order]
+
+# Factor the Cluster and Individual columns for proper ordering
+qlong$Individual <- factor(qlong$Individual, levels = ordering)
+qlong$Cluster <- factor(qlong$Cluster, levels = paste0("P", 1:K))
+
+
+# Plot
+k7plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = c("#ADE2D0FF", "#C71000FF", "#008EA0FF", "#3F4041FF", "#8A4198FF", "#FF6F00FF", "#FF95A8FF")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+        axis.ticks.x = element_blank()) +
+  labs(title = paste("ADMIXTURE results (K =", K, ", Rep =", rep, ")"),
+       x = "Individuals", y = "Ancestry Proportion")
+k7plot
+```
+<img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/8323c5c7-c354-4c0d-aba9-7610e79f87f9" />
+
+<br>
+<br>
+
+Now K=8:
+```r
+K <- 8
+rep <- 1
+
+# Read the Q matrix
+q <- read_table(paste0("admixture_K", K, "_rep", rep, ".Q"), col_names = FALSE)
+
+# Add individual IDs (in order from .fam file)
+ids <- read_table("../../vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.fam", col_names = FALSE) %>% pull(2)
+
+
+# Add IDs and convert to long format
+qlong <- q %>%
+  mutate(Individual = ids) %>%
+  pivot_longer(-Individual, names_to = "Cluster", values_to = "Ancestry") %>%
+  mutate(Cluster = str_replace(Cluster, "X", "P") %>% as.factor()) %>% 
+  separate(Individual, into = c("Year", "Location", "Species", "Genotype", "TechRep"), sep = "_", remove = FALSE)
+
+
+# ---- Ordered by hierarchical clustering ---
+# Assign rownames for clustering
+qmat <- as.matrix(q)
+rownames(qmat) <- ids
+
+# Use hierarchical clustering on Q matrix to order samples in plot
+hc <- hclust(dist(qmat), method = "ward.D2")
+ordering <- hc$labels[hc$order]
+
+# Factor the Cluster and Individual columns for proper ordering
+qlong$Individual <- factor(qlong$Individual, levels = ordering)
+qlong$Cluster <- factor(qlong$Cluster, levels = paste0("P", 1:K))
+
+
+# Plot
+k8plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = c("#3F4041FF", "#008EA0FF", "#FF6F00FF","#FF6348FF", "#ADE2D0FF", "#8A4198FF", "#C71000FF", "#FF95A8FF")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+        axis.ticks.x = element_blank()) +
+  labs(title = paste("ADMIXTURE results (K =", K, ", Rep =", rep, ")"),
+       x = "Individuals", y = "Ancestry Proportion")
+k8plot
+```
+<img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/a4d2ebde-19c0-4d68-96d0-92f7b3529bdf" />
+
+<br>
+<br>
+
+Combo plots:
+```r
+library(cowplot)
+plot_grid(k2plot, k3plot, k4plot, k5plot, ncol = 1)
+plot_grid(k6plot, k7plot, k8plot, ncol = 1)
+```
+<img width="3840" height="1900" alt="image" src="https://github.com/user-attachments/assets/22690c92-5f51-4335-a63f-ed6ae04e5332" />
+<img width="3840" height="1900" alt="image" src="https://github.com/user-attachments/assets/b0058efd-05a3-4749-a97c-1ebfd6326069" />
 
 
 
