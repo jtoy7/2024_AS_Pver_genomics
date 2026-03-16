@@ -4353,7 +4353,6 @@ done > cv_loglik_summary.tsv
 Plot cross validation error to look for best K:
 `plot_admixture_results_clonepruned_Pacutaonly.R`
 
-
 ```r
 rm(list = ls())
 library(tidyverse)
@@ -4388,6 +4387,7 @@ ggplot(cvsum, aes(x = K, y = Mean_CV)) +
 ```
 <img width="2387" height="1552" alt="image" src="https://github.com/user-attachments/assets/49d138d7-a51f-43ad-88bb-da90c937005e" />
 
+<br>
 
 ```r
 # Compute ΔK using the Evanno method
@@ -4451,6 +4451,7 @@ plot_grid(evannop1, evannop2, evannop3, evannop4, ncol = 2)
 ```
 <img width="2387" height="1552" alt="image" src="https://github.com/user-attachments/assets/16e8efa7-00fc-4dd1-91f4-17386f5b7f23" />
 
+<br>
 
 Plot admixture proportions for various K
 ```r
@@ -4497,6 +4498,7 @@ k2plot
 ```
 <img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/6ab5cbd3-b803-48bf-b530-55a93188eea1" />
 
+<br>
 
 K=3
 ```r
@@ -4542,6 +4544,8 @@ k3plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
        x = "Individuals", y = "Ancestry Proportion")
 k3plot
 ```
+
+<img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/4cb3f85f-3eb5-4206-a554-f648a519ba29" />
 
 
 
