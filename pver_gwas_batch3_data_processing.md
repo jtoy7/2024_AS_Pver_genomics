@@ -4352,9 +4352,197 @@ done > cv_loglik_summary.tsv
 
 Plot cross validation error to look for best K:
 `plot_admixture_results_clonepruned_Pacutaonly.R`
-```r
 
+
+```r
+rm(list = ls())
+library(tidyverse)
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/admixture/clone_pruned_Pacuta_only/")
+
+
+# load cross validation errors for all runs (3 runs x 10 K values)
+cv <- read_table("cv_loglik_summary.tsv", col_names = c("K", "Rep", "CV_Error", "LogLik")) %>%
+  mutate(K = str_remove(K, "K") %>% as.numeric(),
+         Rep = str_remove(Rep, "rep") %>% as.numeric)
+
+# calculate mean and sd
+cvsum <- cv %>% 
+  group_by(K) %>% 
+  summarize(Mean_CV = mean(CV_Error),
+            SD_CV = sd(CV_Error),
+            Mean_LogLik = mean(LogLik),
+            SD_LogLik = sd(LogLik))
+
+# plot CV Error vs. K
+ggplot(cvsum, aes(x = K, y = Mean_CV)) +
+  geom_line(color = "deepskyblue3", linewidth = 1) +
+  geom_point(size = 2, color = "deepskyblue3") +
+  geom_errorbar(aes(ymin = Mean_CV - SD_CV, ymax = Mean_CV + SD_CV), width = 0.1, color = "gray50") +
+  scale_x_continuous(breaks = cvsum$K) +
+  labs(title = "ADMIXTURE CV Error by K",
+       x = "Number of Ancestral Populations (K)",
+       y = "Mean CV Error ± SD") +
+  theme_bw(base_size = 14)
+
+# Lowest CV error at K=3
 ```
+<img width="2387" height="1552" alt="image" src="https://github.com/user-attachments/assets/49d138d7-a51f-43ad-88bb-da90c937005e" />
+
+
+```r
+# Compute ΔK using the Evanno method
+evanno <- cvsum %>%
+  mutate(
+    Lnext = lead(Mean_LogLik),             # L(K+1)
+    Lprev = lag(Mean_LogLik),              # L(K-1)
+    diff2 = abs(Lnext - 2 * Mean_LogLik + Lprev), # L"(K)
+    DeltaK = diff2 / SD_LogLik
+  )
+
+# Plot L vs K
+evannop1 <- ggplot(evanno, aes(x = K, y = Mean_LogLik)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Evanno Method",
+       x = "Number of clusters (K)",
+       y = "L") +
+  scale_x_continuous(breaks = unique(evanno$K))
+evannop1
+
+# Plot L' vs K
+evannop2 <- ggplot(evanno, aes(x = K, y = Mean_LogLik - Lprev)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Evanno Method",
+       x = "Number of clusters (K)",
+       y = expression("L'")) +
+  scale_x_continuous(breaks = unique(evanno$K))
+evannop2
+
+# Plot L" vs K
+evannop3 <- ggplot(evanno, aes(x = K, y = diff2)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Evanno Method",
+       x = "Number of clusters (K)",
+       y = expression("L\"")) +
+  scale_x_continuous(breaks = unique(evanno$K))
+evannop3
+# After K=2, largest L" occurs at K=5
+
+
+# Plot ΔK vs K
+evannop4 <- ggplot(evanno, aes(x = K, y = DeltaK)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Evanno Method",
+       x = "Number of clusters (K)",
+       y = expression(Delta*K)) +
+  scale_x_continuous(breaks = unique(evanno$K))
+evannop4
+# Largest ΔK occurs at K=2
+
+library(cowplot)
+plot_grid(evannop1, evannop2, evannop3, evannop4, ncol = 2)
+```
+<img width="2387" height="1552" alt="image" src="https://github.com/user-attachments/assets/16e8efa7-00fc-4dd1-91f4-17386f5b7f23" />
+
+
+Plot admixture proportions for various K
+```r
+# Set K and replicate to visualize
+K <- 2
+rep <- 1
+
+# Read the Q matrix
+q <- read_table(paste0("admixture_K", K, "_rep", rep, ".Q"), col_names = FALSE)
+
+# Add individual IDs (in order from .fam file)
+ids <- read_table("../../vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.fam", col_names = FALSE) %>% pull(2)
+
+
+# Add IDs and convert to long format
+qlong <- q %>%
+  mutate(Individual = ids) %>%
+  pivot_longer(-Individual, names_to = "Cluster", values_to = "Ancestry") %>%
+  mutate(Cluster = str_replace(Cluster, "X", "P") %>% as.factor()) %>% 
+  separate(Individual, into = c("Year", "Location", "Species", "Genotype", "TechRep"), sep = "_", remove = FALSE)
+
+
+# --- Order by ancestry in a reference cluster ---
+ordering <- qlong %>%
+  filter(Cluster == "P1") %>%
+  arrange(desc(Ancestry)) %>%
+  pull(Individual)
+
+# Apply ordering
+qlong$Individual <- factor(qlong$Individual, levels = ordering)
+qlong$Cluster <- factor(qlong$Cluster, levels = paste0("P", 1:K))
+
+
+
+k2plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = c("#8A4198FF", "#FF6F00FF")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+        axis.ticks.x = element_blank()) +
+  labs(title = paste("ADMIXTURE results (K =", K, ", Rep =", rep, ")"),
+       x = "Individuals", y = "Ancestry Proportion")
+k2plot
+```
+<img width="3835" height="862" alt="image" src="https://github.com/user-attachments/assets/6ab5cbd3-b803-48bf-b530-55a93188eea1" />
+
+
+K=3
+```r
+K <- 3
+rep <- 1
+
+# Read the Q matrix
+q <- read_table(paste0("admixture_K", K, "_rep", rep, ".Q"), col_names = FALSE)
+
+# Add individual IDs (in order from .fam file)
+ids <- read_table("../../vcf/pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only.fam", col_names = FALSE) %>% pull(2)
+
+
+# Add IDs and convert to long format
+qlong <- q %>%
+  mutate(Individual = ids) %>%
+  pivot_longer(-Individual, names_to = "Cluster", values_to = "Ancestry") %>%
+  mutate(Cluster = str_replace(Cluster, "X", "P") %>% as.factor()) %>% 
+  separate(Individual, into = c("Year", "Location", "Species", "Genotype", "TechRep"), sep = "_", remove = FALSE)
+
+
+# ---- Ordered by hierarchical clustering ---
+# Assign rownames for clustering
+qmat <- as.matrix(q)
+rownames(qmat) <- ids
+
+# Use hierarchical clustering on Q matrix to order samples in plot
+hc <- hclust(dist(qmat), method = "ward.D2")
+ordering <- hc$labels[hc$order]
+
+# Factor the Cluster and Individual columns for proper ordering
+qlong$Individual <- factor(qlong$Individual, levels = ordering)
+qlong$Cluster <- factor(qlong$Cluster, levels = paste0("P", 1:K))
+
+# Plot
+k3plot <- ggplot(qlong, aes(x = Individual, y = Ancestry, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = c("#FF6F00FF", "#8A4198FF", "#008EA0FF")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+        axis.ticks.x = element_blank()) +
+  labs(title = paste("ADMIXTURE results (K =", K, ", Rep =", rep, ")"),
+       x = "Individuals", y = "Ancestry Proportion")
+k3plot
+```
+
 
 
 
