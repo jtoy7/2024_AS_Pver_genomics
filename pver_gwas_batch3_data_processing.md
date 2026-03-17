@@ -4811,7 +4811,11 @@ plot_grid(k6plot, k7plot, k8plot, ncol = 1)
 <img width="3840" height="1900" alt="image" src="https://github.com/user-attachments/assets/22690c92-5f51-4335-a63f-ed6ae04e5332" />
 <img width="3840" height="1900" alt="image" src="https://github.com/user-attachments/assets/b0058efd-05a3-4749-a97c-1ebfd6326069" />
 
+<br>
+<br>
 
+INTERPRETATION:
+Evanno's ΔK statistic was maximized at K = 2, identifying one major axis of genetic structure (two main populations/clusters). However, ADMIXTURE cross-validation (CV) error was minimized at K = 3, indicating a three cluster model gives the best predictive fit. K = 2 essentially separates Ofu samples from Tutuila samples, with a pretty smooth gradient of mixed ancestry samples in between. Moving to K = 3 separates out a subcluster of Tutuila samples composed mainly of samples from Vatia. At K > 3, additional ancestry components increasingly aligned with additional sampling locations, consistent with fine-scale geographic structure among sampling locations.
 
 
 
