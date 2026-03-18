@@ -4842,6 +4842,321 @@ crun.plink plink2 \
 As a reminder, PLINK used 76,737 variants for this analysis.
 
 
+Visualize PCA results in R
+
+`plot_PCA_pver_clonepruned_Pacuonly.R`:
+```r
+# Plot PCAs from PLINK2 - clone-pruned, P. acuta-only dataset
+# Created: 2026-03-18
+# Last updated: 2026-03-18
+# Jason A. Toy
+
+rm(list = ls())
+
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf")
+
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+
+# Load eigenvectors and eigenvalues
+eigenvec <- read.delim("pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only_pca.eigenvec", header = TRUE, sep = "\t")
+eigenval <- read.delim("pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only_pca.eigenval", header = FALSE)
+
+# Calculate percentage of variance explained
+percent_var <- (eigenval$V1 / sum(eigenval$V1)) * 100
+# [1] 14.95884699582010 12.47233582037397 11.98770527968441 10.23159904076332  9.88307449897391  8.90555387305574  8.60866913323492  7.81991792695315  7.60142826585568  7.53086916528478
+
+# Scree Plot
+scree <- percent_var %>%
+  as_tibble %>%
+  rownames_to_column() %>%
+  dplyr::rename(PC = rowname) %>% 
+  mutate(PC = as.integer(PC)) %>% 
+  mutate(cumulative = cumsum(value))
+
+ggplot(scree) +
+  geom_point(aes(x = PC, y = value, color = "per PC")) + 
+  geom_line(aes(x = PC, y = value, color = "per PC")) + 
+  #geom_point(aes(x = PC, y = cumulative/10, color = "cumulative/10"), size = 1) +
+  #geom_line(aes(x = PC, y = cumulative/10, color = "cumulative/10"), linetype = "dashed") +
+  scale_color_manual(name = "", values = c("per PC" = "darkred", "cumulative/10" = "lightblue")) +
+  ylab("Eigen Value") +
+  scale_x_continuous(breaks = 1:10, minor_breaks = NULL) +
+  scale_y_continuous(breaks = 1:16, minor_breaks = NULL) +
+  theme_bw()
+
+
+# Modify eigenvec for plotting
+eigenvec_plot <- eigenvec %>%
+  separate(X.IID, into = c("Year", "Location", "Species", "Genotype", "Lib_ID"), sep = "_", extra = "merge") %>% 
+  mutate(Geno_ID = paste0(Location, "_", Species, "_", Genotype)) %>% 
+  mutate(Species = as.factor(Species),
+         Location = as.factor(Location)) %>% 
+  mutate(Species = recode_factor(Species, "Pver" = "Pacu"),
+         Island = case_when(
+           Location %in% c("OFU3", "OFU6") ~ "Ofu",
+           TRUE ~ "Tutuila"
+         )) %>%
+  mutate(Island = as.factor(Island)) %>% 
+  filter(Species == "Pacu")
+
+# Get breakdown of sample size per location
+table(eigenvec_plot$Location)
+# ALOF AOAA FALU FASA FTEL LEON MALO OFU3 OFU6 VATI 
+#   16   12   14    8   24   14    9   17    7   14
+
+
+# Compute convex hulls (polygons) per location for use in plots
+hull_data12 <- eigenvec_plot %>%
+  group_by(Island, Location) %>%
+  slice(chull(PC1, PC2)) %>%  # identifies and keeps subset of points which lie on the convex hull of the set of points specified
+  arrange(Location)
+
+hull_data34 <- eigenvec_plot %>%
+  group_by(Island, Location) %>%
+  slice(chull(PC3, PC4)) %>%  # identifies and keeps subset of points which lie on the convex hull of the set of points specified
+  arrange(Location)
+
+hull_data56 <- eigenvec_plot %>%
+  group_by(Island, Location) %>%
+  slice(chull(PC5, PC6)) %>%  # identifies and keeps subset of points which lie on the convex hull of the set of points specified
+  arrange(Location)
+
+
+
+# Plot PCAs
+library(ggsci)
+mypal <- pal_d3("category20")(11)
+
+#PC 1/2
+# color by location, all dots, shape by island
+PC12_color <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data12,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+PC12_color
+
+# faceted by island
+PC12_island <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  geom_point(size = 3, alpha = 0.6) +
+  #stat_ellipse(aes(group = Location, color = Location), level = 0.95, linewidth = 0.6) +
+  geom_polygon(data = hull_data12,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Island) +
+  theme_bw()
+PC12_island
+
+# faceted by location
+PC12_location <- ggplot(eigenvec_plot, aes(x = PC1, y = PC2, shape = Island, color = Location)) +
+  scale_shape_manual(values = c(17,16)) +
+  scale_color_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data12,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC1: ", round(percent_var[1], 2), "% variance")) +
+  ylab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+PC12_location
+
+
+
+
+# PC 3/4
+# color by location, all dots, shape by island
+PC34_color <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data34,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+PC34_color
+
+# faceted by island
+PC34_island <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data34,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Island) +
+  theme_bw()
+PC34_island
+
+# faceted by location
+PC34_location <- ggplot(eigenvec_plot, aes(x = PC3, y = PC4, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data34,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  ylab(paste0("PC4: ", round(percent_var[4], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+PC34_location
+
+
+
+
+# PC56
+# color by location, all dots, shape by island
+PC56_color <- ggplot(eigenvec_plot, aes(x = PC5, y = PC6, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data56,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  ylab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+PC56_color
+
+# faceted by island
+PC56_island <- ggplot(eigenvec_plot, aes(x = PC5, y = PC6, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data56,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  ylab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Island) +
+  theme_bw()
+PC56_island
+
+# faceted by location
+PC56_location <- ggplot(eigenvec_plot, aes(x = PC5, y = PC6, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data56,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC5: ", round(percent_var[5], 2), "% variance")) +
+  ylab(paste0("PC6: ", round(percent_var[6], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+PC56_location
+
+
+# combo plots
+library(cowplot)
+plot_grid(PC12_color, PC34_color, PC56_color, nrow = 3)
+plot_grid(PC12_island, PC34_island, PC56_island, nrow = 3)
+plot_grid(PC12_location, PC34_location, ncol = 2)
+```
+<img width="822" height="1992" alt="image" src="https://github.com/user-attachments/assets/70895b48-2946-438d-8c97-3cc936ab82ad" />
+
+<img width="1348" height="1992" alt="image" src="https://github.com/user-attachments/assets/adc8c514-da11-4260-bfc1-fd2352f27ff4" />
+
+
+3D plot of PCs 1-3:
+```r
+# 3D plots
+library(plotly)
+
+# created named color pallete
+mypal_named <- pal_d3("category20")(10)
+names(mypal_named) <- levels(eigenvec_plot$Location)
+
+# PCs 1-3
+plot_ly(
+  data = eigenvec_plot,
+  x = ~PC1,
+  y = ~PC2,
+  z = ~PC3,
+  color = ~Location,
+  colors = mypal_named,
+  # symbol = ~Island,
+  # symbols = c("triangle-up", "circle"),
+  text = ~Geno_ID,
+  type = 'scatter3d',
+  mode = 'markers',
+  marker = list(size = 3)
+) %>%
+  layout(
+    scene = list(
+      xaxis = list(title = paste0("PC1: ", round(percent_var[1], 2), "% variance")),
+      yaxis = list(title = paste0("PC2: ", round(percent_var[2], 2), "% variance")),
+      zaxis = list(title = paste0("PC3: ", round(percent_var[3], 2), "% variance"))
+    )
+  )
+
+
+# PCs 2-4
+plot_ly(
+  data = eigenvec_plot,
+  x = ~PC2,
+  y = ~PC3,
+  z = ~PC4,
+  color = ~Location,
+  colors = mypal_named,
+  # symbol = ~Species,
+  # symbols = c("square", "circle"),
+  text = ~Geno_ID,
+  type = 'scatter3d',
+  mode = 'markers',
+  marker = list(size = 3)
+) %>%
+  layout(
+    scene = list(
+      xaxis = list(title = paste0("PC2: ", round(percent_var[2], 2), "% variance")),
+      yaxis = list(title = paste0("PC3: ", round(percent_var[3], 2), "% variance")),
+      zaxis = list(title = paste0("PC4: ", round(percent_var[4], 2), "% variance"))
+    )
+  )
+```
+<img width="1141" height="880" alt="image" src="https://github.com/user-attachments/assets/8e9a4df7-a439-4505-859a-873d1659d5fa" />
+
+<img width="1083" height="878" alt="image" src="https://github.com/user-attachments/assets/bd48879f-f968-42a6-b7b6-01305409d7fa" />
+
+
+
+
+
+
 
 
 
