@@ -4818,6 +4818,33 @@ INTERPRETATION:
 Evanno's ΔK statistic was maximized at K = 2, identifying one major axis of genetic structure (two main populations/clusters). However, ADMIXTURE cross-validation (CV) error was minimized at K = 3, indicating a three cluster model gives the best predictive fit. K = 2 essentially separates Ofu samples from Tutuila samples, with a pretty smooth gradient of mixed ancestry samples in between. Moving to K = 3 separates out a subcluster of Tutuila samples composed mainly of samples from Vatia. Additional ancestry components (K > 3) increasingly align with additional sampling locations, consistent with fine-scale geographic structure among them.
 
 
+## Rerun PCA with clone-pruned Pacuta-only dataset
+First recreate the clone-pruned Pacuta-only dataset in PLINK2 format from the original non-clone-pruned pfiles. This keeps the formatting standard (we changed the chromosome names in the previous step to be able to run ADMIXTURE):
+```bash
+module load plink/2.0-2026.01.10
+
+cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf
+
+crun.plink plink2 \
+  --pfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes \
+  --keep keep_samples_Pacuta_only.txt \
+  --make-pgen \
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only
+```
+
+Now run PCA in PLINK2:
+```bash
+crun.plink plink2 \
+  --pfile pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only \
+  --pca 10 \
+  --out pver_all_QDPSB_MISSMAF05filtered_ld_pruned_0.2_genotypes_clonepruned_Pacuta_only_pca
+```
+As a reminder, PLINK used 76,737 variants for this analysis.
+
+
+
+
+
 
 
 
