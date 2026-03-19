@@ -4845,7 +4845,8 @@ As a reminder, PLINK used 76,737 variants for this analysis.
 <br>
 
 ### Visualize PCA results in R
-Note: 5 samples labeled as "Extra" in the field, but identified genetically as P. acuta were included in the PCA computation in PLINK2. After confirming they were not outliers in the PCA plots, I filtered them out of the dataset in R and created all plots without them.
+Note: 5 samples labeled as "Extra" in the field, but identified genetically as P. acuta were included in the PCA computation in PLINK2. Two were from Alofau and three from Fagatele. After confirming they were not outliers in initial PCA plots, I filtered them out of the dataset in R and recreated all plots without them.
+
 `plot_PCA_pver_clonepruned_Pacuonly.R`:
 ```r
 # Plot PCAs from PLINK2 - clone-pruned, P. acuta-only dataset
