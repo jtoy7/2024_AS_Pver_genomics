@@ -4841,9 +4841,11 @@ crun.plink plink2 \
 ```
 As a reminder, PLINK used 76,737 variants for this analysis.
 
+<br>
+<br>
 
-Visualize PCA results in R
-
+### Visualize PCA results in R
+Note: 5 samples labeled as "Extra" in the field, but identified genetically as P. acuta were included in the PCA computation in PLINK2. After confirming they were not outliers in the PCA plots, I filtered them out of the dataset in R and created all plots without them.
 `plot_PCA_pver_clonepruned_Pacuonly.R`:
 ```r
 # Plot PCAs from PLINK2 - clone-pruned, P. acuta-only dataset
@@ -4899,7 +4901,7 @@ eigenvec_plot <- eigenvec %>%
            TRUE ~ "Tutuila"
          )) %>%
   mutate(Island = as.factor(Island)) %>% 
-  filter(Species == "Pacu")
+  filter(Species == "Pacu")  # remove "Extra" samples
 
 # Get breakdown of sample size per location
 table(eigenvec_plot$Location)
