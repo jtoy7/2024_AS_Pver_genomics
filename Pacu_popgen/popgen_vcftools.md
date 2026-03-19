@@ -31,7 +31,7 @@ module load bcftools
 cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf
 
 crun.bcftools bcftools view \
-  -S keep_samples_Pacuta_only.samples \
+  -S keep_samples_Pacutaonly_noExtras.samples \
   -v snps -m2 -M2 \
   -Ou \
   pver_all_QDPSBfiltered_genotypes.vcf.gz | \
