@@ -5232,6 +5232,9 @@ PC1 separates Ofu sites from Tutuila sites. Subsequent PCs start pulling out ind
 
 
 ### Test for differences in multivariate dispersion across groups
+
+**Note**: This is not the best way to test for differences in genetic variance (weights all included PCs equally) but it get the point across as an inital test.
+
 ```r
 ## Test for differences in multivariate dispersion
 library(vegan)
@@ -5288,7 +5291,7 @@ VATI-AOAA 0.1029777370655443  0.000122844687794638 0.205832629443294 4.946044266
 MALO-LEON 0.1062355124256867 -0.005469218410678836 0.217940243262052 7.68972758339250e-02
 MALO-FALU 0.1050152326249051 -0.006689498211460379 0.216719963461271 8.43181199680531e-02
 ```
-Not the best way to test for differences in genetic variance (weights all included PCs equally) but it get the point across as an inital test.
+
 
 <br>
 
