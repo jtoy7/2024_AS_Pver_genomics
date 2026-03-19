@@ -5153,8 +5153,70 @@ plot_ly(
 <img width="1083" height="878" alt="image" src="https://github.com/user-attachments/assets/bd48879f-f968-42a6-b7b6-01305409d7fa" />
 
 
+Plot PC2 vs PC3:
+```r
+# Compute convex hulls (polygons)
+hull_data23 <- eigenvec_plot %>%
+  group_by(Island, Location) %>%
+  slice(chull(PC2, PC3)) %>%  # identifies and keeps subset of points which lie on the convex hull of the set of points specified
+  arrange(Location)
 
 
+# color by location, all dots, shape by island
+PC23_color <- ggplot(eigenvec_plot, aes(x = PC2, y = PC3, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  # geom_polygon(data = hull_data23,
+  #              aes(group = Location, fill = Location, color = Location),
+  #              alpha = 0.1) +
+  xlab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  ylab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  theme_bw()
+PC23_color
+
+# faceted by island
+PC23_island <- ggplot(eigenvec_plot, aes(x = PC2, y = PC3, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data23,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  ylab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  #geom_text_repel(aes(label = Geno_ID), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Island) +
+  theme_bw()
+PC23_island
+
+# faceted by location
+PC23_location <- ggplot(eigenvec_plot, aes(x = PC2, y = PC3, shape = Island, color = Location)) +
+  scale_color_manual(values = mypal) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_fill_manual(values = mypal) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_polygon(data = hull_data23,
+               aes(group = Location, fill = Location, color = Location),
+               alpha = 0.1) +
+  xlab(paste0("PC2: ", round(percent_var[2], 2), "% variance")) +
+  ylab(paste0("PC3: ", round(percent_var[3], 2), "% variance")) +
+  #geom_text_repel(aes(label = Genotype), size = 2, max.overlaps = Inf) +
+  facet_wrap(~ Location) +
+  theme_bw()
+PC23_location
+```
+
+<img width="1206" height="967" alt="image" src="https://github.com/user-attachments/assets/d0395497-c4f7-4f0e-807c-20c352e35cf3" />
+
+<img width="1587" height="759" alt="image" src="https://github.com/user-attachments/assets/a26b3ace-0594-457c-ac23-ff6a914befbe" />
+
+<img width="1587" height="759" alt="image" src="https://github.com/user-attachments/assets/3a0ca33b-5c03-4aa2-9ba0-d9ed259a042c" />
+
+<img width="1587" height="1093" alt="image" src="https://github.com/user-attachments/assets/670289cd-4bef-4a13-af46-baca83ba2454" />
 
 
 
