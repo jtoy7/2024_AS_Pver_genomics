@@ -5224,7 +5224,7 @@ PC23_location
 
 INTERPRETATION:
 
-PC1 separates Ofu sites from Tutuila sites. Subsequent PCs start pulling out individual Tutuila sites from each other. PCs 2 and 3 separate out Vatia and Fagatele. Fagasa also groups with Vatia to some extent. PCs 5 and 6 separate Aoa out from the other sites.
+PC1 separates Ofu sites from Tutuila sites. Subsequent PCs start pulling out individual Tutuila sites from each other. PCs 2 and 3 separate out Vatia and Fagatele. Fagasa also groups with Vatia to some extent. PCs 5 and 6 separate Aoa out from the other sites. This pretty closely mirrors what we see in the ADMIXTURE plots as K is increased from 2 to 8.
 
 
 <br>
