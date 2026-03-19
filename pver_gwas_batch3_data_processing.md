@@ -5222,8 +5222,75 @@ PC23_location
 <img width="1587" height="1093" alt="image" src="https://github.com/user-attachments/assets/670289cd-4bef-4a13-af46-baca83ba2454" />
 
 
+INTERPRETATION:
+
+PC1 separates Ofu sites from Tutuila sites. Subsequent PCs start pulling out individual Tutuila sites from each other. PCs 2 and 3 separate out Vatia and Fagatele. Fagasa also groups with Vatia to some extent. PCs 5 and 6 separate Aoa out from the other sites.
 
 
+<br>
+<br>
+
+
+### Test for differences in multivariate dispersion across groups
+```r
+## Test for differences in multivariate dispersion
+library(vegan)
+
+# create distance matrix (Euclidean) using all 10 PCs calculated
+dist_mat <- eigenvec_plot %>%
+  select("PC1", "PC2", "PC3", "PC4") %>% 
+  as.matrix() %>%
+  dist()
+
+# calculate group-level dispersion
+bd <- betadisper(dist_mat, group = eigenvec_plot$Location)
+
+# test for differences
+anova(bd)
+
+# permutation test
+permutest(bd, permutations = 9999)
+
+# pairwise comparisons
+tukey <- TukeyHSD(bd)
+tukey$group %>% as.data.frame() %>% arrange(`p adj`) %>%  filter(`p adj` <= 0.1)
+```
+
+```
+Analysis of Variance Table
+
+Response: Distances
+           Df          Sum Sq           Mean Sq F value     Pr(>F)    
+Groups      9 0.2791534549153 0.031017050546140 4.70945 2.1533e-05 ***
+Residuals 125 0.8232661377631 0.006586129102105                       
+---
+
+
+Permutation test for homogeneity of multivariate dispersions
+Permutation: free
+Number of permutations: 9999
+
+Response: Distances
+           Df          Sum Sq           Mean Sq       F N.Perm Pr(>F)    
+Groups      9 0.2791534549153 0.031017050546140 4.70945   9999  2e-04 ***
+Residuals 125 0.8232661377631 0.006586129102105                          
+---
+
+
+                        diff                   lwr               upr                p adj
+VATI-LEON 0.1587069984397873  0.059887214282167381 0.257526782597407 3.82060193723222e-05
+VATI-FALU 0.1574867186390058  0.058666934481385838 0.256306502796626 4.54201475111882e-05
+VATI-OFU3 0.1230670809650424  0.028707655180421343 0.217426506749664 1.97459845841630e-03
+VATI-OFU6 0.1446986397347868  0.023669615895718032 0.265727663573856 6.91964736292350e-03
+VATI-ALOF 0.1121580951254735  0.016476250545905097 0.207839939705042 8.94028240981826e-03
+VATI-FTEL 0.0927415663650093  0.004816019006696606 0.180667113723322 2.99051700502747e-02
+VATI-AOAA 0.1029777370655443  0.000122844687794638 0.205832629443294 4.94604426623936e-02
+MALO-LEON 0.1062355124256867 -0.005469218410678836 0.217940243262052 7.68972758339250e-02
+MALO-FALU 0.1050152326249051 -0.006689498211460379 0.216719963461271 8.43181199680531e-02
+```
+Not the best way to test for differences in genetic variance (weights all included PCs equally) but it get the point across as an inital test.
+
+<br>
 
 
 
