@@ -129,3 +129,105 @@ Shows that non-variant positions were actually called.
 
 <br>
 
+### Filter the all-sites VCF for each scaffold
+
+Variant and non-variant sites will need to be filtered separately and then recombined.
+
+- Start with hard filters for quality, depth, and strand bias.
+- Then subset to the clone-pruned, P. acuta-only sample set
+- Then apply missingnessfilters
+
+Run this as an array job applying filters to each scaffold separately:
+```bash
+#!/bin/bash
+
+#SBATCH --job-name=filter_allsites_vcf_for_pixy_2026-03-24
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-52%30
+#SBATCH --ntasks=1
+#SBATCH --mem=30G
+#SBATCH --time=2-00:00:00
+#SBATCH --cpus-per-task=10
+
+set -euo pipefail
+
+module load bcftools vcftools
+
+BASEDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
+INDIR=$BASEDIR/vcf_allsites
+OUTDIR=$BASEDIR/vcf_allsites/filtered
+SAMPLES=$BASEDIR/vcf/keep_samples_Pacutaonly_noExtras.samples
+SCAFLIST=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list
+
+mkdir -p "$OUTDIR"
+
+TASK_ID=${SLURM_ARRAY_TASK_ID}
+SCAF=$(sed -n "${TASK_ID}p" "$SCAFLIST")
+INVCF="${INDIR}/${SCAF}_allsites_genotypes.vcf.gz"
+
+echo "Processing scaffold: $SCAF"
+echo "Input VCF: $INVCF"
+echo "Sample list: $SAMPLES"
+
+if [[ ! -f "$INVCF" ]]; then
+  echo "ERROR: Input VCF not found: $INVCF" >&2
+  exit 1
+fi
+
+# 1) Filter for variant SNPs using the same hard filters from variant-only workflow,
+#    then subset to clone-pruned, Pacuta-only samples.
+crun.bcftools bcftools view \
+  -v snps -m2 -M2 \
+  "$INVCF" -Ou | \
+crun.bcftools bcftools filter \
+  -e 'QUAL < 30 || INFO/MQ < 40 || INFO/DP < 792 || INFO/DP > 25286 || INFO/QD < 2.0 || INFO/FS > 60.0 || INFO/SOR > 3.0' \
+  -Ou | \
+crun.bcftools bcftools view --threads 10 \
+  -S "$SAMPLES" \
+  -Oz -o "${OUTDIR}/${SCAF}.variant.subset.vcf.gz"
+
+crun.bcftools bcftools index "${OUTDIR}/${SCAF}.variant.subset.vcf.gz"
+
+# 2) Pull invariant sites, then subset to clone-pruned Pacuta-only samples.
+#    No QUAL/QD/FS/SOR filtering here.
+crun.bcftools bcftools view \
+  -v none \
+  "$INVCF" -Ou | \
+crun.bcftools bcftools view --threads 10 \
+  -S "$SAMPLES" \
+  -Oz -o "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz"
+
+crun.bcftools bcftools index "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz"
+
+# 3) Apply the same missingness filter to each subset separately.
+crun.vcftools vcftools \
+  --gzvcf "${OUTDIR}/${SCAF}.variant.subset.vcf.gz" \
+  --max-missing 0.8 \
+  --recode --stdout | \
+crun.bcftools bgzip -c > "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz"
+
+crun.vcftools vcftools \
+  --gzvcf "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz" \
+  --max-missing 0.8 \
+  --recode --stdout | \
+crun.bcftools bgzip -c > "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz"
+
+crun.bcftools bcftools index "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz"
+crun.bcftools bcftools index "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz"
+
+# 4) Recombine the filtered variant and invariant records into a final pixy-ready all-sites VCF.
+crun.bcftools bcftools concat --threads 10 \
+  --allow-overlaps \
+  "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz" \
+  "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz" \
+  -Oz -o "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz"
+
+crun.bcftools bcftools index "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz"
+
+echo "Finished scaffold: $SCAF"
+
+```
