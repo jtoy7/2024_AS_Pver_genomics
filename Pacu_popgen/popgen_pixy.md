@@ -135,7 +135,7 @@ Variant and non-variant sites will need to be filtered separately and then recom
 
 - Start with hard filters for quality, depth, and strand bias.
 - Then subset to the clone-pruned, P. acuta-only sample set
-- Then apply missingnessfilters
+- Then apply missingness filter (max missingness per site = 20%)
 
 Run this as an array job applying filters to each scaffold separately:
 ```bash
@@ -197,6 +197,9 @@ crun.bcftools bcftools index "${OUTDIR}/${SCAF}.variant.subset.vcf.gz"
 crun.bcftools bcftools view \
   -v none \
   "$INVCF" -Ou | \
+crun.bcftools bcftools filter \
+  -e 'INFO/DP < 792 || INFO/DP > 25286' \
+  -Ou | \
 crun.bcftools bcftools view --threads 10 \
   -S "$SAMPLES" \
   -Oz -o "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz"
@@ -224,10 +227,53 @@ crun.bcftools bcftools concat --threads 10 \
   --allow-overlaps \
   "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz" \
   "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz" \
+  -Ou | \
+crun.bcftools bcftools sort --threads 10 \
   -Oz -o "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz"
 
 crun.bcftools bcftools index "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz"
 
 echo "Finished scaffold: $SCAF"
 
+```
+Runtime:
+
+<br>
+
+Check how many nonvariant sites were removed by filters:
+```bash
+# variant sites
+bcftools view -H -v snps -m2 -M2 input.vcf.gz | wc -l; \
+bcftools view -v snps -m2 -M2 input.vcf.gz -Ou | bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | bcftools view -H | wc -l
+
+# invariant sites
+bcftools view -H -v none input.vcf.gz | wc -l; \
+bcftools view -v none input.vcf.gz -Ou | bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | bcftools view -H | wc -l
+```
+As for-loop across all scaffolds:
+```bash
+SCAFLIST=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list
+INDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf_allsites
+
+echo -e "scaffold\tvar_before\tvar_after\tvar_pct_removed\tinv_before\tinv_after\tinv_pct_removed"
+
+while read SCAF; do
+  INVCF="${INDIR}/${SCAF}_allsites_genotypes.vcf.gz"
+
+  vb=$(bcftools view -H -v snps -m2 -M2 "$INVCF" | wc -l)
+  va=$(bcftools view -v snps -m2 -M2 "$INVCF" -Ou | \
+       bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | \
+       bcftools view -H | wc -l)
+
+  ib=$(bcftools view -H -v none "$INVCF" | wc -l)
+  ia=$(bcftools view -v none "$INVCF" -Ou | \
+       bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | \
+       bcftools view -H | wc -l)
+
+  vp=$(awk -v b=$vb -v a=$va 'BEGIN{if(b>0) printf "%.2f", (b-a)/b*100; else print "NA"}')
+  ip=$(awk -v b=$ib -v a=$ia 'BEGIN{if(b>0) printf "%.2f", (b-a)/b*100; else print "NA"}')
+
+  echo -e "${SCAF}\t${vb}\t${va}\t${vp}\t${ib}\t${ia}\t${ip}"
+
+done < "$SCAFLIST"
 ```
