@@ -94,7 +94,7 @@ $GATK --java-options "-Xmx95g" GenotypeGVCFs \
   -L ${SCAF}
   -O $OUTDIR/${SCAF}_genotypes.vcf.gz
 ```
-The longest scaffold took about 24 hrs to complete.
+The longest scaffold took 40.5 hrs to complete.
 
 <br>
 
@@ -141,7 +141,7 @@ Run this as an array job applying filters to each scaffold separately:
 ```bash
 #!/bin/bash
 
-#SBATCH --job-name=filter_allsites_vcf_for_pixy_2026-03-24
+#SBATCH --job-name=filter_allsites_vcf_for_pixy_2026-03-25
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
@@ -155,7 +155,7 @@ Run this as an array job applying filters to each scaffold separately:
 
 set -euo pipefail
 
-module load bcftools vcftools
+module load bcftools dosage_convertor
 
 BASEDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
 INDIR=$BASEDIR/vcf_allsites
@@ -187,13 +187,13 @@ crun.bcftools bcftools filter \
   -e 'QUAL < 30 || INFO/MQ < 40 || INFO/DP < 792 || INFO/DP > 25286 || INFO/QD < 2.0 || INFO/FS > 60.0 || INFO/SOR > 3.0' \
   -Ou | \
 crun.bcftools bcftools view --threads 10 \
-  -S "$SAMPLES" \
+  -S "$SAMPLES" -a \
   -Oz -o "${OUTDIR}/${SCAF}.variant.subset.vcf.gz"
 
 crun.bcftools bcftools index "${OUTDIR}/${SCAF}.variant.subset.vcf.gz"
 
 # 2) Pull invariant sites, then subset to clone-pruned Pacuta-only samples.
-#    No QUAL/QD/FS/SOR filtering here.
+#    No QUAL/QD/FS/SOR filtering here; just DP filtering.
 crun.bcftools bcftools view \
   -v none \
   "$INVCF" -Ou | \
@@ -210,13 +210,13 @@ crun.bcftools bcftools index "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz"
 crun.vcftools vcftools \
   --gzvcf "${OUTDIR}/${SCAF}.variant.subset.vcf.gz" \
   --max-missing 0.8 \
-  --recode --stdout | \
+  --recode --recode-INFO-all --stdout | \
 crun.bcftools bgzip -c > "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz"
 
 crun.vcftools vcftools \
   --gzvcf "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz" \
   --max-missing 0.8 \
-  --recode --stdout | \
+  --recode --recode-INFO-all --stdout | \
 crun.bcftools bgzip -c > "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz"
 
 crun.bcftools bcftools index "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz"
@@ -237,6 +237,12 @@ echo "Finished scaffold: $SCAF"
 
 ```
 Runtime:
+
+Notes:
+<br>
+- After sample subsetting, some formerly variant sites may lose all observed ALT alleles in the retained samples, making them invariant in the final dataset. However, these sites will still retain the ALT record from the original sample set and therefore be classified by pixy as variants. The `-a` option in `bcftools view` removes ALT alleles not seen in the retained genotypes. The record is kept but ALT is set to ".", properly reclassifying the as invariant.
+- Also, the `bcftools view` command is the exception within the bcftools suite that **does** update INFO/AC and INFO/AN after subsetting with -S (unless you explicitly use the `-I/--no-update` flag), so the AC and AN info fields are updated as well in the final sample set.
+- The `--recode-INFO-all` flag in the `vcftools` commands ensures that INFO fields are kept in the output vcf (these are otherwise removed by `--recode` by default).
 
 <br>
 
