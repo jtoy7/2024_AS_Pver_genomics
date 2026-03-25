@@ -137,11 +137,14 @@ Variant and non-variant sites will need to be filtered separately and then recom
 - Then subset to the clone-pruned, P. acuta-only sample set
 - Then apply missingness filter (max missingness per site = 20%)
 
-Run this as an array job applying filters to each scaffold separately:
+Run this as an array job applying filters to each scaffold separately. Note that VCFtools is installed in a module called `dosage_convertor`.
+<br>
+
+`filter_allsites_vcf_for_pixy_array.slurm`:
 ```bash
 #!/bin/bash
 
-#SBATCH --job-name=filter_allsites_vcf_for_pixy_2026-03-25
+#SBATCH --job-name=filter_allsites_vcf_for_pixy_array_2026-03-25
 #SBATCH --output=%A_%a_%x.out
 #SBATCH --error=%A_%a_%x.err
 #SBATCH --mail-type=ALL
@@ -195,7 +198,7 @@ crun.bcftools bcftools index "${OUTDIR}/${SCAF}.variant.subset.vcf.gz"
 # 2) Pull invariant sites, then subset to clone-pruned Pacuta-only samples.
 #    No QUAL/QD/FS/SOR filtering here; just DP filtering.
 crun.bcftools bcftools view \
-  -v none \
+  -i 'ALT="."' \
   "$INVCF" -Ou | \
 crun.bcftools bcftools filter \
   -e 'INFO/DP < 792 || INFO/DP > 25286' \
@@ -240,6 +243,8 @@ Runtime:
 
 Notes:
 <br>
+- `bcftools view -v snps -m2 -M2` limits variants to biallelic SNPs.
+- `bcftools view -i 'ALT="."'` identifies and keeps invariants by selecting sites where the ALT field is ".".
 - After sample subsetting, some formerly variant sites may lose all observed ALT alleles in the retained samples, making them invariant in the final dataset. However, these sites will still retain the ALT record from the original sample set and therefore be classified by pixy as variants. The `-a` option in `bcftools view` removes ALT alleles not seen in the retained genotypes. The record is kept but ALT is set to ".", properly reclassifying the as invariant.
 - Also, the `bcftools view` command is the exception within the bcftools suite that **does** update INFO/AC and INFO/AN after subsetting with -S (unless you explicitly use the `-I/--no-update` flag), so the AC and AN info fields are updated as well in the final sample set.
 - The `--recode-INFO-all` flag in the `vcftools` commands ensures that INFO fields are kept in the output vcf (these are otherwise removed by `--recode` by default).
