@@ -229,7 +229,7 @@ crun.bcftools bcftools concat --threads 10 \
   "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz" \
   "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz" \
   -Ou | \
-crun.bcftools bcftools sort --threads 10 \
+crun.bcftools bcftools sort \
   -Oz -o "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz"
 
 crun.bcftools bcftools index "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz"
