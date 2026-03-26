@@ -158,7 +158,7 @@ Run this as an array job applying filters to each scaffold separately. Note that
 
 set -euo pipefail
 
-module load bcftools dosage_convertor
+module load bcftools
 
 BASEDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
 INDIR=$BASEDIR/vcf_allsites
@@ -210,17 +210,15 @@ crun.bcftools bcftools view --threads 10 \
 crun.bcftools bcftools index "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz"
 
 # 3) Apply the same missingness filter to each subset separately.
-crun.vcftools vcftools \
-  --gzvcf "${OUTDIR}/${SCAF}.variant.subset.vcf.gz" \
-  --max-missing 0.8 \
-  --recode --recode-INFO-all --stdout | \
-crun.bcftools bgzip -c > "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz"
+crun.bcftools bcftools view --threads 10 \
+  -i 'F_MISSING<=0.2' \
+  "${OUTDIR}/${SCAF}.variant.subset.vcf.gz" \
+  -Oz -o "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz"
 
-crun.vcftools vcftools \
-  --gzvcf "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz" \
-  --max-missing 0.8 \
-  --recode --recode-INFO-all --stdout | \
-crun.bcftools bgzip -c > "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz"
+crun.bcftools bcftools view --threads 10 \
+  -i 'F_MISSING<=0.2' \
+  "${OUTDIR}/${SCAF}.invariant.subset.vcf.gz" \
+  -Oz -o "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz"
 
 crun.bcftools bcftools index "${OUTDIR}/${SCAF}.variant.subset.miss80.vcf.gz"
 crun.bcftools bcftools index "${OUTDIR}/${SCAF}.invariant.subset.miss80.vcf.gz"
@@ -288,3 +286,8 @@ while read SCAF; do
 
 done < "$SCAFLIST"
 ```
+
+<br>
+<br>
+
+## Run pixy
