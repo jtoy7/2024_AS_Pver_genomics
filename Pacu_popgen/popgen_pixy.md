@@ -237,7 +237,7 @@ crun.bcftools bcftools index "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz"
 echo "Finished scaffold: $SCAF"
 
 ```
-Runtime:
+Runtime: 1 hr 39 min
 
 Notes:
 <br>
@@ -247,6 +247,28 @@ Notes:
 - Also, the `bcftools view` command is the exception within the bcftools suite that **does** update INFO/AC and INFO/AN after subsetting with -S (unless you explicitly use the `-I/--no-update` flag), so the AC and AN info fields are updated as well in the final sample set.
 - The `--recode-INFO-all` flag in the `vcftools` commands ensures that INFO fields are kept in the output vcf (these are otherwise removed by `--recode` by default).
 
+<br>
+
+Run some QC checks on one chromosome:
+```bash
+SCAF=NC_089320.1_Pverrucosa
+OUTDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf_allsites/filtered
+
+# number of records in final VCF
+crun.bcftools bcftools index -n "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz"
+
+# confirm mix of invariant and variant sites
+crun.bcftools bcftools query -f '%ALT\n' "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz" | \
+sort | uniq -c | head
+
+# check for duplicate positions
+crun.bcftools bcftools query -f '%CHROM\t%POS\n' "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz" | \
+sort | uniq -d | head
+
+# count FILTER states in final file
+crun.bcftools bcftools query -f '%FILTER\n' "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz" | \
+sort | uniq -c | sort -nr
+```
 <br>
 
 Check how many nonvariant sites were removed by filters:
