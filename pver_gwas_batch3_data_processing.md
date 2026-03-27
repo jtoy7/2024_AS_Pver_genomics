@@ -5293,6 +5293,7 @@ MALO-FALU 0.1050152326249051 -0.006689498211460379 0.216719963461271 8.431811996
 ```
 
 <br>
+
 Plot dispersions:
 ```r
 # boxplot of dispersions
@@ -5306,6 +5307,7 @@ ggplot(bd_df, aes(Location, distance, fill = Location)) +
   geom_boxplot() +
   theme_bw()
 ```
+
 <img width="1452" height="1435" alt="image" src="https://github.com/user-attachments/assets/3599305f-b03a-418d-9e56-088d15e6e08e" />
 
 
