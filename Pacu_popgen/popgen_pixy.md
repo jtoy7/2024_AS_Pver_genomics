@@ -269,47 +269,221 @@ sort | uniq -d | head
 crun.bcftools bcftools query -f '%FILTER\n' "${OUTDIR}/${SCAF}.pixy_ready.vcf.gz" | \
 sort | uniq -c | sort -nr
 ```
+```
+# number of records
+14488018
+
+# breakdown of sites by variant type
+14315858 .
+  49683 A
+  36316 C
+  36331 G
+  49830 T
+
+# no duplicate positions
+
+# breakdown of sites by FILTER state
+14335363 PASS
+  152655 LowQual
+```
 <br>
 
-Check how many nonvariant sites were removed by filters:
+Check how many nonvariant sites were removed by depth filters:
 ```bash
+PREDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf_allsites/
+
 # variant sites
-bcftools view -H -v snps -m2 -M2 input.vcf.gz | wc -l; \
-bcftools view -v snps -m2 -M2 input.vcf.gz -Ou | bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | bcftools view -H | wc -l
+crun.bcftools bcftools view -H -v snps -m2 -M2 "${PREDIR}/${SCAF}_allsites_genotypes.vcf.gz" | wc -l; \
+crun.bcftools bcftools view -v snps -m2 -M2 "${PREDIR}/${SCAF}_allsites_genotypes.vcf.gz" -Ou | crun.bcftools bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | crun.bcftools bcftools view -H | wc -l
 
 # invariant sites
-bcftools view -H -v none input.vcf.gz | wc -l; \
-bcftools view -v none input.vcf.gz -Ou | bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | bcftools view -H | wc -l
+crun.bcftools bcftools view -H -i 'ALT="."' "${PREDIR}/${SCAF}_allsites_genotypes.vcf.gz" | wc -l; \
+crun.bcftools bcftools view -i 'ALT="."' "${PREDIR}/${SCAF}_allsites_genotypes.vcf.gz" -Ou | crun.bcftools bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | crun.bcftools bcftools view -H | wc -l
 ```
-As for-loop across all scaffolds:
-```bash
-SCAFLIST=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list
-INDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf_allsites
-
-echo -e "scaffold\tvar_before\tvar_after\tvar_pct_removed\tinv_before\tinv_after\tinv_pct_removed"
-
-while read SCAF; do
-  INVCF="${INDIR}/${SCAF}_allsites_genotypes.vcf.gz"
-
-  vb=$(bcftools view -H -v snps -m2 -M2 "$INVCF" | wc -l)
-  va=$(bcftools view -v snps -m2 -M2 "$INVCF" -Ou | \
-       bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | \
-       bcftools view -H | wc -l)
-
-  ib=$(bcftools view -H -v none "$INVCF" | wc -l)
-  ia=$(bcftools view -v none "$INVCF" -Ou | \
-       bcftools filter -e 'INFO/DP < 792 || INFO/DP > 25286' -Ou | \
-       bcftools view -H | wc -l)
-
-  vp=$(awk -v b=$vb -v a=$va 'BEGIN{if(b>0) printf "%.2f", (b-a)/b*100; else print "NA"}')
-  ip=$(awk -v b=$ib -v a=$ia 'BEGIN{if(b>0) printf "%.2f", (b-a)/b*100; else print "NA"}')
-
-  echo -e "${SCAF}\t${vb}\t${va}\t${vp}\t${ib}\t${ia}\t${ip}"
-
-done < "$SCAFLIST"
 ```
+1700484 # variant sites pre-depth-filtering
+1560077 # variant sites post-depth-filtering
+
+20267886 # invariant sites pre-depth-filtering
+16842347 # invariant sites post-depth-filtering
+```
+Summary:
+- Variant SNPs: 8.3% removed by DP filtering
+- Invariant sites: 16.9% removed by DP filtering
+
+So depth filtering removed more invariant sites on this chromosome than variant sites, but not drastically so. Still lots of invariant sites remaining.
 
 <br>
 <br>
 
 ## Run pixy
+
+We'll run three separate pixy commands that address three different groups of biological questions:
+- Whole dataset within-population only (summary of diversity in the species at the region scale)
+- Per-location within-location summary + pairwise-between-location comparisons
+- Per-island within-island summary + pairwise-between-island comparison
+
+<br>
+
+`pixy_10kb_array.slurm`:
+```bash
+#!/bin/bash
+#SBATCH --job-name=pixy_10kb_array_2026-03-26
+#SBATCH --output=%A_%a_%x.out
+#SBATCH --error=%A_%a_%x.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=jtoy@odu.edu
+#SBATCH --partition=main
+#SBATCH --array=1-52%24
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=40G
+#SBATCH --time=5-00:00:00
+
+set -euo pipefail
+
+module load pixy/2.0.0.beta14
+
+BASEDIR=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all
+VCFDIR=$BASEDIR/vcf_allsites/filtered
+POPDIR=$BASEDIR/vcf
+OUTBASE=$BASEDIR/pixy
+SCAFLIST=/cm/shared/courses/dbarshis/barshislab/jtoy/references/genomes/pocillopora_verrucosa/ncbi_dataset/data/GCF_036669915.1/genome_regions.list
+WINDOW=10000
+NCORES=${SLURM_CPUS_PER_TASK}
+
+mkdir -p $OUTBASE/{all,location,island}
+
+SCAF=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$SCAFLIST")
+VCF=${VCFDIR}/${SCAF}.pixy_ready.vcf.gz
+
+echo "Scaffold: $SCAF"
+echo "VCF: $VCF"
+
+# 1) whole dataset within-pop stats
+crun.pixy pixy \
+  --stats pi watterson_theta tajima_d \
+  --vcf "$VCF" \
+  --populations ${POPDIR}/pixy_all.pop.tsv \
+  --window_size ${WINDOW} \
+  --n_cores ${NCORES} \
+  --output_folder ${OUTBASE}/all \
+  --output_prefix ${SCAF}.all
+
+# 2) location-level within + pairwise between-location stats
+crun.pixy pixy \
+  --stats pi watterson_theta tajima_d fst dxy \
+  --vcf "$VCF" \
+  --populations ${POPDIR}/pixy_location.pop.tsv \
+  --window_size ${WINDOW} \
+  --n_cores ${NCORES} \
+  --fst_type hudson \
+  --output_folder ${OUTBASE}/location \
+  --output_prefix ${SCAF}.location
+
+# 3) island-level within + pairwise between-island stats
+crun.pixy pixy \
+  --stats pi watterson_theta tajima_d fst dxy \
+  --vcf "$VCF" \
+  --populations ${POPDIR}/pixy_island.pop.tsv \
+  --window_size ${WINDOW} \
+  --n_cores ${NCORES} \
+  --fst_type hudson \
+  --output_folder ${OUTBASE}/island \
+  --output_prefix ${SCAF}.island
+```
+Runtime : 26 minutes
+
+<br>
+
+This job returned a "Failed, Mixed, ExitCode [0-1]" status. Upon inspecting the .err files, this is because some scaffold jobs had "no invariant sites (ALT = ".")". These scaffolds were all non-chromosome scaffolds. All 14 chromosome jobs completed successfully, along with 13 non-chromosome scaffold jobs.
+
+In addition, 9 of the non-chromosome scaffolds that completed successfully did not output a `_fst.txt` file. This is probably because these scaffolds did not have any usable **variant** sites with which Fst is normally calculated. To confirm this, run the following script to count SNPs in each scaffold that does not have a `_fst.txt` file:
+```bash
+cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/pixy/location
+
+echo -e "SCAF\tSNPs"
+
+for f in *_pi.txt; do
+    base=${f%_pi.txt}
+    
+    # skip if fst file exists
+    [[ -f "${base}_fst.txt" ]] && continue
+    
+    scaf=${base%.location}
+    VCF=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf_allsites/filtered/${scaf}.pixy_ready.vcf.gz
+    
+    nsnps=$(crun.bcftools bcftools view -H -v snps "$VCF" | wc -l)
+    
+    echo -e "${scaf}\t${nsnps}"
+done | column -t
+```
+```
+SCAF    SNPs
+NW_027078169.1_Pverrucosa  0
+NW_027078170.1_Pverrucosa  0
+NW_027078172.1_Pverrucosa  0
+NW_027078173.1_Pverrucosa  0
+NW_027078175.1_Pverrucosa  0
+NW_027078176.1_Pverrucosa  0
+NW_027078177.1_Pverrucosa  0
+NW_027078184.1_Pverrucosa  0
+NW_027078186.1_Pverrucosa  0
+```
+
+
+This script can also be modified to summarize all scaffolds:
+```bash
+cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/pixy/location
+
+echo -e "SCAF\tFST_file\tSNPs\tInvariants"
+
+for f in *_pi.txt; do
+    base=${f%_pi.txt}
+    scaf=${base%.location}
+    
+    VCF=/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf_allsites/filtered/${scaf}.pixy_ready.vcf.gz
+    
+    if [[ -f "${base}_fst.txt" ]]; then
+        fst="YES"
+    else
+        fst="NO"
+    fi
+    
+    nsnps=$(crun.bcftools bcftools view -H -v snps "$VCF" | wc -l)
+    ninv=$(crun.bcftools bcftools view -H -i 'ALT="."' "$VCF" | wc -l)
+    
+    echo -e "${scaf}\t${fst}\t${nsnps}\t${ninv}"
+done | column -t
+```
+```
+SCAF    FST_file        SNPs    Invariants
+NC_089312.1_Pverrucosa     YES  271452  20172532
+NC_089313.1_Pverrucosa     YES  141161  12477459
+NC_089314.1_Pverrucosa     YES  241576  18034983
+NC_089315.1_Pverrucosa     YES  217468  18140369
+NC_089316.1_Pverrucosa     YES  117313  9576545
+NC_089317.1_Pverrucosa     YES  138045  10829275
+NC_089318.1_Pverrucosa     YES  126604  13058179
+NC_089319.1_Pverrucosa     YES  172642  13694399
+NC_089320.1_Pverrucosa     YES  172160  14315858
+NC_089321.1_Pverrucosa     YES  149826  11991088
+NC_089322.1_Pverrucosa     YES  93692   8959628
+NC_089323.1_Pverrucosa     YES  111098  10484937
+NC_089324.1_Pverrucosa     YES  110014  9872963
+NC_089325.1_Pverrucosa     YES  151880  12937449
+NW_027078166.1_Pverrucosa  YES  6       4663
+NW_027078169.1_Pverrucosa  NO   0       335
+NW_027078170.1_Pverrucosa  NO   0       1016
+NW_027078171.1_Pverrucosa  YES  3       3009
+NW_027078172.1_Pverrucosa  NO   0       416
+NW_027078173.1_Pverrucosa  NO   0       546
+NW_027078175.1_Pverrucosa  NO   0       1322
+NW_027078176.1_Pverrucosa  NO   0       2643
+NW_027078177.1_Pverrucosa  NO   0       564
+NW_027078184.1_Pverrucosa  NO   0       16
+NW_027078186.1_Pverrucosa  NO   0       263
+NW_027078193.1_Pverrucosa  YES  7       1270
+NW_027078194.1_Pverrucosa  YES  1       3618
+```
+So yes, the 9 scaffolds without a `_fst.txt` output file all had 0 variant sites.
