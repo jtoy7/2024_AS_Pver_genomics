@@ -5309,8 +5309,11 @@ ggplot(bd_df, aes(Location, distance, fill = Location)) +
 ```
 
 <img width="1452" height="1435" alt="image" src="https://github.com/user-attachments/assets/3599305f-b03a-418d-9e56-088d15e6e08e" />
-
-
+Sample sizes again for reference:
+```
+ALOF AOAA FALU FASA FTEL LEON MALO OFU3 OFU6 VATI 
+  16   12   14    8   24   14    9   17    7   14
+```
 
 
 
