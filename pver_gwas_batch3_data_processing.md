@@ -5293,8 +5293,20 @@ MALO-FALU 0.1050152326249051 -0.006689498211460379 0.216719963461271 8.431811996
 ```
 
 <br>
+Plot dispersions:
+```r
+# boxplot of dispersions
+bd_df <- data.frame(
+  distance = bd$distances,
+  Location = eigenvec_plot$Location
+)
 
-
+ggplot(bd_df, aes(Location, distance, fill = Location)) +
+  scale_fill_manual(values = mypal) +
+  geom_boxplot() +
+  theme_bw()
+```
+<img width="1452" height="1435" alt="image" src="https://github.com/user-attachments/assets/3599305f-b03a-418d-9e56-088d15e6e08e" />
 
 
 
@@ -5309,6 +5321,8 @@ MALO-FALU 0.1050152326249051 -0.006689498211460379 0.216719963461271 8.431811996
 <br>
 <br>
 <br>
+
+SCRATCH/EXTRA CODE
 
 Take a closer look at quality and depth of discordant sites for a given sample comparison.
 
