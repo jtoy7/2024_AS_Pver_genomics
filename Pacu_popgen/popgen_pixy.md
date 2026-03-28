@@ -487,3 +487,25 @@ NW_027078193.1_Pverrucosa  YES  7       1270
 NW_027078194.1_Pverrucosa  YES  1       3618
 ```
 So yes, the 9 scaffolds without a `_fst.txt` output file all had 0 variant sites.
+
+
+## Filter, summarize, and plot pixy results
+
+Import pixy output files into R and analyze each pixy run and each stat individually.
+`plot_pixy_results.R`
+```
+
+```
+
+Distribution of callable sites per 10kb window (uniform y-axis scale):
+![alt text](image-3.png)
+
+Same plot but allowing free y-axis:
+![alt text](image-2.png)
+
+Distribution of pi across all retained 10kb windows:
+![alt text](image-4.png)
+
+Faceted by chromosome:
+![alt text](image-5.png)
+
