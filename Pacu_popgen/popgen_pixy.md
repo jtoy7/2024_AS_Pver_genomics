@@ -897,7 +897,7 @@ Watterson's theta by window across genome:
 With LOESS smoothing curve:
 ![alt text](image-14.png)
 
-Except for chromosomes with more missing windows, theta seems to be more homogeneous within chromosomes than pi.
+Except for chromosomes with more missing windows, theta seems to be more homogeneous within chromosomes than pi. This makes sense to me because theta is a more coarse measure (essentially number of SNPs), and pi is more sensitive to difference in allele frequencies between those snps (SNPs with minor allele frequencies closer to 0.5 count more than low-frequency SNPs). Relatively homogenous theta means SNP density is fairly uniform across the genome, which indicates that there aren't massive differences in mutation rates.
 
 <br>
 
@@ -954,6 +954,17 @@ ggplot(theta_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
 
 ![alt text](image-16.png)
 
+<br>
+
+Genome-wide weighted means are 0.00210 and 0.00222 for pi and Watterson's theta, respectively.
+
+So θw is slightly larger than π, meaning Tajima's D is slightly negative at the whole-genome scale.
+
+θ > π suggests a slight excess of low-frequency variants. This could be the result of:
+- population expansion OR
+- purifying selection/background selection
+
+<br>
 
 #### Now Tajima's D files:
 ```r
