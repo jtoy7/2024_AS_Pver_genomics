@@ -493,8 +493,85 @@ So yes, the 9 scaffolds without a `_fst.txt` output file all had 0 variant sites
 
 Import pixy output files into R and analyze each pixy run and each stat individually.
 `plot_pixy_results.R`
+```r
+# Filter, summarize, and plot pixy output
+# Created: 2026-03-27
+# Last updated: 2026-03-27
+# Jason A. Toy
+
+
+rm(list = ls())
+
+setwd("/archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/pixy")
+
+library(tidyverse)
+library(ggplot2)
+
+
+
+### These pixy files were generated from a pixy run on the clone-pruned, P. acuta-only dataset (n=135)
 ```
 
+### Start with "ALL" pixy run (single meta-population stats)
+#### Start with pi files:
+```r
+# Pi files first
+
+# Load in files
+pi_all_files <- list.files(
+  "./all/",
+  pattern = "_pi.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(pi_all_files) <- pi_all_files
+
+# import and combine all pi files while creating new column with file path/name
+pi_all_raw <- map_dfr(pi_all_files, read_tsv, .id = "source_file")
+
+# reformatting
+pi_all <- pi_all_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(pi_all)
+```
+```
+tibble [35,236 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file      : chr [1:35236] "./all//NC_089312.1_Pverrucosa.all_pi.txt" "./all//NC_089312.1_Pverrucosa.all_pi.txt" "./all//NC_089312.1_Pverrucosa.all_pi.txt" "./all//NC_089312.1_Pverrucosa.all_pi.txt" ...
+ $ pop              : Factor w/ 1 level "ALL": 1 1 1 1 1 1 1 1 1 1 ...
+ $ chromosome       : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1     : num [1:35236] 1 10001 20001 30001 40001 ...
+ $ window_pos_2     : num [1:35236] 1e+04 2e+04 3e+04 4e+04 5e+04 6e+04 7e+04 8e+04 9e+04 1e+05 ...
+ $ avg_pi           : num [1:35236] NA 0 0 0.00115 NA ...
+ $ no_sites         : num [1:35236] 0 189 864 2425 0 ...
+ $ count_diffs      : num [1:35236] NA 0 0 74315 NA ...
+ $ count_comparisons: num [1:35236] NA 6000427 26662599 64611456 NA ...
+ $ count_missing    : num [1:35236] NA 863108 4713561 23452419 NA ...
+```
+
+<br>
+
+```r
+# plot distribution of callable sites per 10kb window
+ggplot(pi_all, aes(x = no_sites)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~ chromosome) +
+  labs(
+    x = "Number of callable sites per window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 10000, by = 2000)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+  # For all chromosomes (NCs), the main peak is around 9000 sites, with most of the hump between 8000 and 10,000
+  # This indicates good coverage of callable sites and allows us to set a lower end cutoff of 7000 (retaining windows with >= 70% of sites callable)
+  # This removes low-information regions while retaining the majority of high-quality genomic windows
 ```
 
 Distribution of callable sites per 10kb window (uniform y-axis scale):
@@ -503,11 +580,188 @@ Distribution of callable sites per 10kb window (uniform y-axis scale):
 Same plot but allowing free y-axis:
 ![alt text](image-2.png)
 
+```r
+# filter dataset based on 7000 site cutoff
+pi_all_filt <- pi_all %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering
+pi_all %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+```
+
+```
+  total retained  prop
+  <int>    <int> <dbl>
+  35236    16961 0.481
+```
+
+<br>
+
+```r
+# sensitivity check: try other cutoffs to see how it changes number of retained windows
+pi_all %>%
+  summarise(
+    prop_6000 = mean(no_sites >= 6000),
+    prop_7000 = mean(no_sites >= 7000),
+    prop_8000 = mean(no_sites >= 8000)
+  )
+```
+
+```
+  prop_6000 prop_7000 prop_8000
+      <dbl>     <dbl>     <dbl>
+      0.542     0.481     0.367
+```
+Decreasing cutoff to 6000 doesn't add that much more data (6%). Increasing to 8000 removes a significant chunk of data (11%). So it looks like 7000 sites is a good sweet spot.
+
+<br>
+
+```r
+# plot distribution of pi across filtered 10kb windows
+ggplot(pi_all_filt, aes(x = avg_pi)) +
+  geom_histogram(bins = 50) +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+
+# calculate mean pi weighted by number of callable sites per window
+wmean_pi_all <- weighted.mean(pi_all_filt$avg_pi, pi_all_filt$no_sites)
+# genome-wide weighted mean pi = 0.00210149001149776
+
+# replot with weighted mean pi
+ggplot(pi_all_filt, aes(x = avg_pi)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = wmean_pi_all, linetype = "dashed") +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+
+  # Distribution is right-skewed with longer tail at higher values
+```
+
 Distribution of pi across all retained 10kb windows:
 ![alt text](image-4.png)
+Distribution is right-skewed with longer tail at higher values.
 
+```r
+# calculate full summary stats for genome-wide pi
+pi_all_filt %>%
+  summarise(
+    w_mean = weighted.mean(avg_pi, no_sites),
+    median = median(avg_pi),
+    sd = sd(avg_pi),
+    q05 = quantile(avg_pi, 0.05),
+    q95 = quantile(avg_pi, 0.95)
+  )
+```
+```
+   w.mean  median      sd      q05     q95
+    <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+  0.00210 0.00193 0.00119 0.000325 0.00418
+```
+
+```r
+# facet by chromosome
+ggplot(pi_all_filt, aes(x = avg_pi)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = wmean_pi_all, linetype = "dashed") +
+  facet_wrap(~ chromosome) +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
 Faceted by chromosome:
 ![alt text](image-5.png)
 
+<br>
+
+```r
+# plot pi by window across genome
+ggplot(pi_all_filt, aes(x = window_pos_1, y = avg_pi)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "π"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
 Pi of 10kb windows across the genome:
 ![alt text](image-6.png)
+
+With LOESS smoothing curve:
+![alt text](image-7.png)
+
+Pi looks pretty consistent across chromosomes (background genomic variation fairly homogenous; no obvious genome-wide structure). Pi generally ranges from 0 to 0.006 for all chromosomes, with majority of windows below 0.004 (as seen in the distribution plot). Some fine scale heterogeneity within chromosomes (regions of realtively high or low pi). Low-pi regions could represent conserved regions or evidence of selective sweeps. High-pi regions could indicate balancing selection, introgression, or regions with high recombination rates. Chromosomes 16.1 and 17.1 seem to have the most missing data.
+
+```r
+# calculate pi per chromosome
+pi_sum_by_chrom <- pi_all_filt %>%
+  group_by(chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    w_mean = weighted.mean(avg_pi, no_sites),  # weighted mean pi
+    uw_mean = mean(avg_pi),                    # unweighted mean pi
+    median = median(avg_pi),
+    sd = sd(avg_pi),
+    q05 = quantile(avg_pi, 0.05),
+    q95 = quantile(avg_pi, 0.95),
+    .groups = "drop"
+  )
+```
+```
+   chromosome  n_windows total_sites  w_mean uw_mean  median      sd      q05     q95
+   <fct>           <int>       <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+ 1 NC_089312.1      1929    16465783 0.00221 0.00216 0.00206 0.00117 0.000382 0.00424
+ 2 NC_089313.1      1238    10583414 0.00197 0.00193 0.00180 0.00113 0.000326 0.00404
+ 3 NC_089314.1      1674    14327238 0.00232 0.00228 0.00217 0.00119 0.000512 0.00438
+ 4 NC_089315.1      1711    14649218 0.00216 0.00212 0.00204 0.00117 0.000358 0.00416
+ 5 NC_089316.1       699     5718524 0.00217 0.00210 0.00187 0.00135 0.000253 0.00457
+ 6 NC_089317.1       954     8016663 0.00217 0.00212 0.00199 0.00123 0.000396 0.00430
+ 7 NC_089318.1      1177     9919168 0.00187 0.00182 0.00169 0.00113 0.000210 0.00385
+ 8 NC_089319.1      1303    11201350 0.00216 0.00212 0.00206 0.00120 0.000355 0.00429
+ 9 NC_089320.1      1369    11700279 0.00211 0.00207 0.00193 0.00117 0.000327 0.00426
+10 NC_089321.1      1147     9734480 0.00217 0.00212 0.00203 0.00117 0.000408 0.00420
+11 NC_089322.1       741     6116158 0.00184 0.00178 0.00162 0.00118 0.000170 0.00402
+12 NC_089323.1       872     7254096 0.00194 0.00188 0.00171 0.00122 0.000174 0.00400
+13 NC_089324.1       918     7752971 0.00195 0.00190 0.00178 0.00114 0.000230 0.00390
+14 NC_089325.1      1229    10542673 0.00205 0.00202 0.00191 0.00114 0.000362 0.00401
+```
+<br>
+
+```r
+# plot summary stats
+ggplot(pi_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2) +
+  labs(
+    x = "Chromosome",
+    y = expression(pi~"(5th-95th percentile range)")
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+![alt text](image-8.png)
+
+<br>
+
+#### Now Watterson's theta files:
+```r
+
+```
