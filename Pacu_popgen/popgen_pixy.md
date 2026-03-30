@@ -509,3 +509,5 @@ Distribution of pi across all retained 10kb windows:
 Faceted by chromosome:
 ![alt text](image-5.png)
 
+Pi of 10kb windows across the genome:
+![alt text](image-6.png)
