@@ -599,6 +599,7 @@ pi_all %>%
   <int>    <int> <dbl>
   35236    16961 0.481
 ```
+Note that this filtering removes all non-chromosome scaffolds from the dataset.
 
 <br>
 
@@ -648,7 +649,7 @@ ggplot(pi_all_filt, aes(x = avg_pi)) +
   # Distribution is right-skewed with longer tail at higher values
 ```
 
-Distribution of pi across all retained 10kb windows:
+Distribution of pi across all retained 10kb windows (weighted mean = 0.00210):
 ![alt text](image-4.png)
 Distribution is right-skewed with longer tail at higher values.
 
@@ -762,6 +763,199 @@ ggplot(pi_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
 <br>
 
 #### Now Watterson's theta files:
+```r
+# Now load in Watterson's theta files
+
+# Load in files
+theta_all_files <- list.files(
+  "./all/",
+  pattern = "watterson_theta.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(theta_all_files) <- theta_all_files
+
+# import and combine all pi files while creating new column with file path/name
+theta_all_raw <- map_dfr(theta_all_files, read_tsv, .id = "source_file")
+
+# reformatting
+theta_all <- theta_all_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(theta_all)
+```
+
+```
+tibble [35,236 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file        : chr [1:35236] "./all//NC_089312.1_Pverrucosa.all_watterson_theta.txt" "./all//NC_089312.1_Pverrucosa.all_watterson_theta.txt" "./all//NC_089312.1_Pverrucosa.all_watterson_theta.txt" "./all//NC_089312.1_Pverrucosa.all_watterson_theta.txt" ...
+ $ pop                : Factor w/ 1 level "ALL": 1 1 1 1 1 1 1 1 1 1 ...
+ $ chromosome         : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1       : num [1:35236] 1 10001 20001 30001 40001 ...
+ $ window_pos_2       : num [1:35236] 1e+04 2e+04 3e+04 4e+04 5e+04 6e+04 7e+04 8e+04 9e+04 1e+05 ...
+ $ avg_watterson_theta: num [1:35236] NA 0 0 0.00103 NA ...
+ $ no_sites           : num [1:35236] 0 189 864 2425 0 ...
+ $ raw_watterson_theta: num [1:35236] NA 0 0 2.51 NA ...
+ $ no_var_sites       : num [1:35236] 0 0 0 15 0 0 18 21 62 0 ...
+ $ weighted_no_sites  : num [1:35236] NA 179 794 2071 NA ...
+```
+
+<br>
+
+```r
+# filter dataset based on 7000 site cutoff
+theta_all_filt <- theta_all %>% 
+  filter(no_sites >= 7000)
+
+
+# plot distribution of theta across filtered 10kb windows
+ggplot(theta_all_filt, aes(x = avg_watterson_theta)) +
+  geom_histogram(bins = 50) +
+  labs(
+    x = "Watterson's θ",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+
+# calculate mean theta weighted by number of callable sites per window
+wmean_theta_all <- weighted.mean(theta_all_filt$avg_watterson_theta, theta_all_filt$no_sites)
+# genome-wide weighted mean theta = 0.00222358854498557
+
+# replot with weighted mean theta
+ggplot(theta_all_filt, aes(x = avg_watterson_theta)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = wmean_theta_all, linetype = "dashed") +
+  labs(
+    x = "Watterson's θ",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
+
+Distribution of theta across filtered 10kb windows (weighted mean = 0.00222):
+![alt text](image-11.png)
+
+
+```r
+# calculate full summary stats for genome-wide theta
+theta_all_filt %>%
+  summarise(
+    w_mean = weighted.mean(avg_watterson_theta, no_sites),
+    median = median(avg_watterson_theta),
+    sd = sd(avg_watterson_theta),
+    q05 = quantile(avg_watterson_theta, 0.05),
+    q95 = quantile(avg_watterson_theta, 0.95)
+  )
+```
+
+```
+   w_mean  median      sd      q05     q95
+    <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+  0.00222 0.00208 0.00121 0.000410 0.00429
+```
+
+<br>
+
+```r
+# facet by chromosome
+ggplot(theta_all_filt, aes(x = avg_watterson_theta)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = wmean_theta_all, linetype = "dashed") +
+  facet_wrap(~ chromosome) +
+  labs(
+    x = "Watterson's θ",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
+
+Faceted by chromosome:
+![alt text](image-12.png)
+
+<br>
+
+```r
+# plot theta by window across genome
+ggplot(theta_all_filt, aes(x = window_pos_1, y = avg_watterson_theta)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Watterson's θ"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Watterson's theta by window across genome:
+![alt text](image-13.png)
+
+With LOESS smoothing curve:
+![alt text](image-14.png)
+
+Except for chromosomes with more missing windows, theta seems to be more homogeneous within chromosomes than pi.
+
+<br>
+
+```r
+# calculate theta per chromosome
+theta_sum_by_chrom <- theta_all_filt %>%
+  group_by(chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    w_mean = weighted.mean(avg_watterson_theta, no_sites),  # weighted mean theat
+    uw_mean = mean(avg_watterson_theta),                    # unweighted mean theta
+    median = median(avg_watterson_theta),
+    sd = sd(avg_watterson_theta),
+    q05 = quantile(avg_watterson_theta, 0.05),
+    q95 = quantile(avg_watterson_theta, 0.95),
+    .groups = "drop"
+  )
+```
+
+```
+   chromosome  n_windows total_sites  w_mean uw_mean  median      sd      q05     q95
+   <fct>           <int>       <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+ 1 NC_089312.1      1929    16465783 0.00242 0.00237 0.00231 0.00121 0.000532 0.00445
+ 2 NC_089313.1      1238    10583414 0.00200 0.00196 0.00192 0.00103 0.000395 0.00374
+ 3 NC_089314.1      1674    14327238 0.00242 0.00237 0.00232 0.00116 0.000626 0.00433
+ 4 NC_089315.1      1711    14649218 0.00218 0.00214 0.00211 0.00108 0.000452 0.00391
+ 5 NC_089316.1       699     5718524 0.00274 0.00266 0.00224 0.00176 0.000412 0.00583
+ 6 NC_089317.1       954     8016663 0.00242 0.00237 0.00211 0.00152 0.000485 0.00516
+ 7 NC_089318.1      1177     9919168 0.00183 0.00179 0.00170 0.00105 0.000247 0.00370
+ 8 NC_089319.1      1303    11201350 0.00227 0.00222 0.00221 0.00112 0.000420 0.00414
+ 9 NC_089320.1      1369    11700279 0.00216 0.00211 0.00202 0.00113 0.000403 0.00413
+10 NC_089321.1      1147     9734480 0.00226 0.00221 0.00210 0.00115 0.000491 0.00419
+11 NC_089322.1       741     6116158 0.00208 0.00202 0.00190 0.00129 0.000211 0.00443
+12 NC_089323.1       872     7254096 0.00213 0.00207 0.00187 0.00130 0.000237 0.00428
+13 NC_089324.1       918     7752971 0.00206 0.00200 0.00192 0.00113 0.000308 0.00401
+14 NC_089325.1      1229    10542673 0.00213 0.00209 0.00209 0.00104 0.000472 0.00382
+```
+
+<br>
+
+```r
+# plot summary stats
+ggplot(theta_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2) +
+  labs(
+    x = "Chromosome",
+    y = expression("Watterson's"~theta~"(5th-95th percentile range)")
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+![alt text](image-16.png)
+
+
+#### Now Tajima's D files:
 ```r
 
 ```
