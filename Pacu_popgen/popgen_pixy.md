@@ -1198,6 +1198,43 @@ ggplot(tajimad_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
 ```
 ![alt text](image-22.png)
 
-Slightly negative Tajima's D is fairly consistent across the genome, with some smaller regions trending above zero. This is most likely indicative of either weak background selection or mild population expansion.
+**Interpretation:** Slightly negative Tajima's D is fairly consistent across the genome, with some smaller regions trending above zero. This is most likely indicative of either weak background selection or mild population expansion.
+
+<br>
+
+Make summary table of genome-wide stats for ALL comparison:
+```r
+# Report weighted means + 5-95% quantile range
+ALL_summary <- tibble(
+  population = "ALL",
+  
+  pi = pi_sum$w_mean,
+  pi_q05 = pi_sum$q05,
+  pi_q95 = pi_sum$q95,
+  
+  theta = theta_sum$w_mean,
+  theta_q05 = theta_sum$q05,
+  theta_q95 = theta_sum$q95,
+  
+  TajimasD = tajimad_sum$w_mean,
+  TajimasD_q05 = tajimad_sum$q05,
+  TajimasD_q95 = tajimad_sum$q95
+)
+
+
+# more readable compact version
+ALL_summary_compact <- tibble(
+  population = "ALL",
+  pi = sprintf("%.3f (%.3f–%.3f)", pi_sum$w_mean, pi_sum$q05, pi_sum$q95),
+  theta = sprintf("%.3f (%.3f–%.3f)", theta_sum$w_mean, theta_sum$q05, theta_sum$q95),
+  TajimasD = sprintf("%.3f (%.3f–%.3f)", tajimad_sum$w_mean, tajimad_sum$q05, tajimad_sum$q95)
+)
+```
+
+```
+  population pi                        theta                     TajimasD             
+  ALL        0.00210 (0.00033–0.00418) 0.00222 (0.00041–0.00429) -0.149 (-1.320–1.068)
+```
+
 
 
