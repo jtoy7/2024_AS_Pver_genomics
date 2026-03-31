@@ -1083,14 +1083,121 @@ Genome-wide weighted mean Tajima's D = -0.149.
 
 Distribution is pretty normal and symmetric, but slightly skewed so that the weighted mean is negative. The positive tail is a slightly longer than the negative tail.
 
-```r
+<br>
 
+```r
+# calculate full summary stats for genome-wide Tajima's D
+tajimad_all_filt %>%
+  summarise(
+    w_mean = weighted.mean(tajima_d, no_sites, na.rm = TRUE),
+    median = median(tajima_d),
+    sd = sd(tajima_d),
+    q05 = quantile(tajima_d, 0.05, na.rm = TRUE),
+    q95 = quantile(tajima_d, 0.95, na.rm = TRUE)
+  )
 ```
 
+```
+  w_mean median    sd   q05   q95
+   <dbl>  <dbl> <dbl> <dbl> <dbl>
+  -0.149     NA    NA -1.32  1.07
+```
+
+<br>
+
+```r
+# facet by chromosome
+ggplot(tajimad_all_filt, aes(x = tajima_d)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = wmean_tajimad_all, linetype = "dashed") +
+  facet_wrap(~ chromosome) +
+  labs(
+    x = "Tajima's D",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
+
+Tajima's D distribution faceted by chromosome:
+![alt text](image-19.png)
+Distribution fairly consistent across chromosomes. Chromosome 16.1 looks slighly shifted to the negative (but this is one of the chromosomes with larger chunks of missing data) and Chromosom 18.1 looks slighly shifted to the positive, compared to the genome-wide distribution.
+
+<br>
+
+```r
+# plot Tajima's D by window across genome
+ggplot(tajimad_all_filt, aes(x = window_pos_1, y = tajima_d)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "steelblue1", linewidth = 0.6) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Tajima's D"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Tajima's D by window across the genome:
+![alt text](image-21.png)
+
+With LOESS smoothing curve:
+![alt text](image-20.png)
 
 
+```r
+# calculate Tajima's D per chromosome
+tajimad_sum_by_chrom <- tajimad_all_filt %>%
+  group_by(chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    w_mean = weighted.mean(tajima_d, no_sites, na.rm = TRUE),  # weighted mean tajima's D
+    uw_mean = mean(tajima_d),                    # unweighted mean tajima's D
+    median = median(tajima_d),
+    sd = sd(tajima_d),
+    q05 = quantile(tajima_d, 0.05, na.rm = TRUE),
+    q95 = quantile(tajima_d, 0.95, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+```
+   chromosome  n_windows total_sites  w_mean uw_mean median     sd   q05   q95
+   <fct>           <int>       <dbl>   <dbl>   <dbl>  <dbl>  <dbl> <dbl> <dbl>
+ 1 NC_089312.1      1929    16465783 -0.262   NA     NA     NA     -1.35 0.896
+ 2 NC_089313.1      1238    10583414 -0.0490  NA     NA     NA     -1.41 1.25 
+ 3 NC_089314.1      1674    14327238 -0.123   -0.123 -0.141  0.641 -1.13 0.956
+ 4 NC_089315.1      1711    14649218 -0.0253  NA     NA     NA     -1.30 1.32 
+ 5 NC_089316.1       699     5718524 -0.587   NA     NA     NA     -1.40 0.281
+ 6 NC_089317.1       954     8016663 -0.207   NA     NA     NA     -1.28 0.990
+ 7 NC_089318.1      1177     9919168  0.0687  NA     NA     NA     -1.24 1.42 
+ 8 NC_089319.1      1303    11201350 -0.159   NA     NA     NA     -1.46 1.05 
+ 9 NC_089320.1      1369    11700279 -0.0692  NA     NA     NA     -1.31 1.12 
+10 NC_089321.1      1147     9734480 -0.124   NA     NA     NA     -1.18 1.03 
+11 NC_089322.1       741     6116158 -0.330   NA     NA     NA     -1.45 0.673
+12 NC_089323.1       872     7254096 -0.266   NA     NA     NA     -1.28 0.778
+13 NC_089324.1       918     7752971 -0.149   NA     NA     NA     -1.22 1.03 
+14 NC_089325.1      1229    10542673 -0.127   NA     NA     NA     -1.46 1.10
+```
+
+<br>
+
+```r
+# plot summary stats
+ggplot(tajimad_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2) +
+  labs(
+    x = "Chromosome",
+    y = "Tajima's D (5th-95th percentile range)"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-22.png)
+
+Slightly negative Tajima's D is fairly consistent across the genome, with some smaller regions trending above zero. This is most likely indicative of either weak background selection or mild population expansion.
 
 
-
-
-Slightly negative Tajima's D that is fairly consistent across the genome is most likely indicative of either weak background selection or mild population expansion.
