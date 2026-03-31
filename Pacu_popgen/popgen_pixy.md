@@ -966,7 +966,131 @@ So θw is slightly larger than π, meaning Tajima's D is slightly negative at th
 
 <br>
 
+```r
+# combine pi and theta into one data frame to plot against each other
+pi_theta_merged <- pi_all_filt %>%
+  select(chromosome, window_pos_1, avg_pi) %>%
+  left_join(
+    theta_all_filt %>%
+      select(chromosome, window_pos_1, avg_watterson_theta),
+    by = c("chromosome", "window_pos_1")
+  ) %>%
+  mutate(diff = avg_pi - avg_watterson_theta)
+
+# plot pi vs theta
+ggplot(pi_theta_merged, aes(x = avg_watterson_theta, y = avg_pi)) +
+  geom_point(alpha = 0.3) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") + 
+  theme_bw()
+```
+
+π vs θw:
+![alt text](image-17.png)
+
+Interpretation:
+- Strong linear relationship as expected
+- Majority of points below the 1:1 line (generally, theta > pi)
+- Fan-shaped spread at higher values (expected, more SNPs = more room for allele freq variation)
+- theta > pi means SNPs are skewed towards rare alleles
+
+<br>
+
+
 #### Now Tajima's D files:
+```r
+# Now load in Tajima's D files
+# Load in files
+tajimad_all_files <- list.files(
+  "./all/",
+  pattern = "_tajima_d.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(tajimad_all_files) <- tajimad_all_files
+
+# import and combine all tajima_d files while creating new column with file path/name
+tajimad_all_raw <- map_dfr(tajimad_all_files, read_tsv, .id = "source_file")
+
+# reformatting
+tajimad_all <- tajimad_all_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(tajimad_all)
+```
+
+```
+tibble [35,236 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file        : chr [1:35236] "./all//NC_089312.1_Pverrucosa.all_tajima_d.txt" "./all//NC_089312.1_Pverrucosa.all_tajima_d.txt" "./all//NC_089312.1_Pverrucosa.all_tajima_d.txt" "./all//NC_089312.1_Pverrucosa.all_tajima_d.txt" ...
+ $ pop                : Factor w/ 1 level "ALL": 1 1 1 1 1 1 1 1 1 1 ...
+ $ chromosome         : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1       : num [1:35236] 1 10001 20001 30001 40001 ...
+ $ window_pos_2       : num [1:35236] 1e+04 2e+04 3e+04 4e+04 5e+04 6e+04 7e+04 8e+04 9e+04 1e+05 ...
+ $ tajima_d           : num [1:35236] NA NA NA 0.514 NA ...
+ $ no_sites           : num [1:35236] 0 189 864 2425 0 ...
+ $ raw_pi             : num [1:35236] NA 0 0 3.02 NA ...
+ $ raw_watterson_theta: num [1:35236] NA 0 0 2.51 NA ...
+ $ tajima_d_stdev     : num [1:35236] NA 0 0 0.994 NA ...
+```
+
+<br>
+
+```r
+# filter dataset based on 7000 site cutoff
+tajimad_all_filt <- tajimad_all %>% 
+  filter(no_sites >= 7000)
+
+
+# plot distribution of Tajima's D across filtered 10kb windows
+ggplot(tajimad_all_filt, aes(x = tajima_d)) +
+  geom_histogram(bins = 50) +
+  labs(
+    x = "Tajima's D",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+
+
+# determine how many NAs in dataset (windows where pi and theta were both 0 (invariant regions), so Tajima's D is undefined)
+tajimad_all_filt %>% filter(is.na(tajima_d)) %>% nrow()
+  # 46 windows have NA for tajima_d
+
+# calculate mean Tajima's D weighted by number of callable sites per window (use na.rm = TRUE to remove NAs)
+wmean_tajimad_all <- weighted.mean(tajimad_all_filt$tajima_d, tajimad_all_filt$no_sites, na.rm = TRUE)
+  # genome-wide weighted mean tajimad = -0.149474782683258
+
+
+# replot with weighted mean tajimad
+ggplot(tajimad_all_filt, aes(x = tajima_d)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = wmean_tajimad_all, linetype = "dashed") +
+  labs(
+    x = "Tajima's D",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+
+# Distribution is pretty normal and symmetric, but slightly skewed so that the weighted mean is negative. The positive tail is a slightly longer than the negative tail.
+```
+
+Distribution of Tajima's D across all filtered 10kb windows:
+![alt text](image-18.png)
+
+Genome-wide weighted mean Tajima's D = -0.149.
+
+Distribution is pretty normal and symmetric, but slightly skewed so that the weighted mean is negative. The positive tail is a slightly longer than the negative tail.
+
 ```r
 
 ```
+
+
+
+
+
+
+
+Slightly negative Tajima's D that is fairly consistent across the genome is most likely indicative of either weak background selection or mild population expansion.
