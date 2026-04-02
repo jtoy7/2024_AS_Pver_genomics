@@ -13,7 +13,7 @@ Calculation of standard population genetics metrics using pixy
 <br>
 
 ### Create sample/population files
-Start by creating a few sample/population files we'll need. First up, create a single-column sample list of clone-pruned P. acuta samples from the existing keep file. Also remove any "Extra" samples. This file is for filtering with vcftools/bcftools and will be called 'keep_samples_Pacutaonly_noExtras.samples':
+Start by creating a few sample/population files we'll need. First up, create a single-column sample list of clone-pruned P. acuta samples from the existing keep file. Also remove any "Extra" samples. This file is for filtering with vcftools/bcftools and will be called `keep_samples_Pacutaonly_noExtras.samples`:
 ```bash
 cd /archive/barshis/barshislab/jtoy/pver_gwas/hologenome_mapped_all/vcf
 
@@ -322,6 +322,8 @@ We'll run three separate pixy commands that address three different groups of bi
 - Whole dataset within-population only (summary of diversity in the species at the region scale)
 - Per-location within-location summary + pairwise-between-location comparisons
 - Per-island within-island summary + pairwise-between-island comparison
+
+For FST, we'll specify Hudson's FST instead of Weir & Cockerham's estimator because it is more robust to differences in sample sizes.
 
 <br>
 
@@ -636,6 +638,13 @@ ggplot(pi_all_filt, aes(x = avg_pi)) +
 wmean_pi_all <- weighted.mean(pi_all_filt$avg_pi, pi_all_filt$no_sites)
 # genome-wide weighted mean pi = 0.00210149001149776
 
+# calculate pooled pi across all windows as recommended by pixy
+pooled_pi_all = sum(pi_all_filt$count_diffs, na.rm = TRUE) / sum(pi_all_filt$count_comparisons, na.rm = TRUE)
+  # genome-wide pooled pi = 0.00210682697930745
+
+# pooled pi and weighted-mean pi are close, but not exactly the same
+
+
 # replot with weighted mean pi
 ggplot(pi_all_filt, aes(x = avg_pi)) +
   geom_histogram(bins = 50) +
@@ -655,8 +664,9 @@ Distribution is right-skewed with longer tail at higher values.
 
 ```r
 # calculate full summary stats for genome-wide pi
-pi_all_filt %>%
+pi_sum <- pi_all_filt %>%
   summarise(
+    pooled_pi = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pixy-recommended aggregate pi across all windows
     w_mean = weighted.mean(avg_pi, no_sites),
     median = median(avg_pi),
     sd = sd(avg_pi),
@@ -665,9 +675,8 @@ pi_all_filt %>%
   )
 ```
 ```
-   w.mean  median      sd      q05     q95
-    <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
-  0.00210 0.00193 0.00119 0.000325 0.00418
+  pooled_pi  w_mean  median      sd      q05     q95
+    0.00211 0.00210 0.00193 0.00119 0.000325 0.00418
 ```
 
 ```r
@@ -716,6 +725,7 @@ pi_sum_by_chrom <- pi_all_filt %>%
   summarise(
     n_windows = n(),
     total_sites = sum(no_sites),
+    pooled_pi = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pixy-recommended aggregate pi across all windows
     w_mean = weighted.mean(avg_pi, no_sites),  # weighted mean pi
     uw_mean = mean(avg_pi),                    # unweighted mean pi
     median = median(avg_pi),
@@ -726,28 +736,28 @@ pi_sum_by_chrom <- pi_all_filt %>%
   )
 ```
 ```
-   chromosome  n_windows total_sites  w_mean uw_mean  median      sd      q05     q95
-   <fct>           <int>       <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
- 1 NC_089312.1      1929    16465783 0.00221 0.00216 0.00206 0.00117 0.000382 0.00424
- 2 NC_089313.1      1238    10583414 0.00197 0.00193 0.00180 0.00113 0.000326 0.00404
- 3 NC_089314.1      1674    14327238 0.00232 0.00228 0.00217 0.00119 0.000512 0.00438
- 4 NC_089315.1      1711    14649218 0.00216 0.00212 0.00204 0.00117 0.000358 0.00416
- 5 NC_089316.1       699     5718524 0.00217 0.00210 0.00187 0.00135 0.000253 0.00457
- 6 NC_089317.1       954     8016663 0.00217 0.00212 0.00199 0.00123 0.000396 0.00430
- 7 NC_089318.1      1177     9919168 0.00187 0.00182 0.00169 0.00113 0.000210 0.00385
- 8 NC_089319.1      1303    11201350 0.00216 0.00212 0.00206 0.00120 0.000355 0.00429
- 9 NC_089320.1      1369    11700279 0.00211 0.00207 0.00193 0.00117 0.000327 0.00426
-10 NC_089321.1      1147     9734480 0.00217 0.00212 0.00203 0.00117 0.000408 0.00420
-11 NC_089322.1       741     6116158 0.00184 0.00178 0.00162 0.00118 0.000170 0.00402
-12 NC_089323.1       872     7254096 0.00194 0.00188 0.00171 0.00122 0.000174 0.00400
-13 NC_089324.1       918     7752971 0.00195 0.00190 0.00178 0.00114 0.000230 0.00390
-14 NC_089325.1      1229    10542673 0.00205 0.00202 0.00191 0.00114 0.000362 0.00401
+   chromosome  n_windows total_sites pooled_pi  w_mean uw_mean  median      sd      q05     q95
+   <fct>           <int>       <dbl>     <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+ 1 NC_089312.1      1929    16465783   0.00221 0.00221 0.00216 0.00206 0.00117 0.000382 0.00424
+ 2 NC_089313.1      1238    10583414   0.00198 0.00197 0.00193 0.00180 0.00113 0.000326 0.00404
+ 3 NC_089314.1      1674    14327238   0.00233 0.00232 0.00228 0.00217 0.00119 0.000512 0.00438
+ 4 NC_089315.1      1711    14649218   0.00217 0.00216 0.00212 0.00204 0.00117 0.000358 0.00416
+ 5 NC_089316.1       699     5718524   0.00218 0.00217 0.00210 0.00187 0.00135 0.000253 0.00457
+ 6 NC_089317.1       954     8016663   0.00218 0.00217 0.00212 0.00199 0.00123 0.000396 0.00430
+ 7 NC_089318.1      1177     9919168   0.00188 0.00187 0.00182 0.00169 0.00113 0.000210 0.00385
+ 8 NC_089319.1      1303    11201350   0.00217 0.00216 0.00212 0.00206 0.00120 0.000355 0.00429
+ 9 NC_089320.1      1369    11700279   0.00211 0.00211 0.00207 0.00193 0.00117 0.000327 0.00426
+10 NC_089321.1      1147     9734480   0.00217 0.00217 0.00212 0.00203 0.00117 0.000408 0.00420
+11 NC_089322.1       741     6116158   0.00184 0.00184 0.00178 0.00162 0.00118 0.000170 0.00402
+12 NC_089323.1       872     7254096   0.00195 0.00194 0.00188 0.00171 0.00122 0.000174 0.00400
+13 NC_089324.1       918     7752971   0.00196 0.00195 0.00190 0.00178 0.00114 0.000230 0.00390
+14 NC_089325.1      1229    10542673   0.00206 0.00205 0.00202 0.00191 0.00114 0.000362 0.00401
 ```
 <br>
 
 ```r
 # plot summary stats
-ggplot(pi_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
+ggplot(pi_sum_by_chrom, aes(x = chromosome, y = pooled_pi)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2) +
   labs(
@@ -758,7 +768,7 @@ ggplot(pi_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-![alt text](image-8.png)
+![alt text](image-30.png)
 
 <br>
 
@@ -824,6 +834,13 @@ ggplot(theta_all_filt, aes(x = avg_watterson_theta)) +
 wmean_theta_all <- weighted.mean(theta_all_filt$avg_watterson_theta, theta_all_filt$no_sites)
 # genome-wide weighted mean theta = 0.00222358854498557
 
+# calculate pooled pi across all windows as recommended by pixy
+pooled_theta_all <- sum(theta_all_filt$raw_watterson_theta, na.rm = TRUE) / sum(theta_all_filt$weighted_no_sites, na.rm = TRUE)
+# genome-wide pooled theta = 0.00223505063350543
+
+# pooled theta and weighted-mean theta are close, but not exactly the same
+
+
 # replot with weighted mean theta
 ggplot(theta_all_filt, aes(x = avg_watterson_theta)) +
   geom_histogram(bins = 50) +
@@ -841,8 +858,9 @@ Distribution of theta across filtered 10kb windows (weighted mean = 0.00222):
 
 ```r
 # calculate full summary stats for genome-wide theta
-theta_all_filt %>%
+theta_sum <- theta_all_filt %>%
   summarise(
+    pooled_theta = sum(raw_watterson_theta, na.rm = TRUE) / sum(weighted_no_sites, na.rm = TRUE),
     w_mean = weighted.mean(avg_watterson_theta, no_sites),
     median = median(avg_watterson_theta),
     sd = sd(avg_watterson_theta),
@@ -852,9 +870,9 @@ theta_all_filt %>%
 ```
 
 ```
-   w_mean  median      sd      q05     q95
-    <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
-  0.00222 0.00208 0.00121 0.000410 0.00429
+  pooled_theta  w_mean  median      sd      q05     q95
+         <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+       0.00224 0.00222 0.00208 0.00121 0.000410 0.00429
 ```
 
 <br>
@@ -908,6 +926,7 @@ theta_sum_by_chrom <- theta_all_filt %>%
   summarise(
     n_windows = n(),
     total_sites = sum(no_sites),
+    pooled_theta = sum(raw_watterson_theta, na.rm = TRUE) / sum(weighted_no_sites, na.rm = TRUE), # pixy-recommended aggregate theta across all windows
     w_mean = weighted.mean(avg_watterson_theta, no_sites),  # weighted mean theat
     uw_mean = mean(avg_watterson_theta),                    # unweighted mean theta
     median = median(avg_watterson_theta),
@@ -919,29 +938,29 @@ theta_sum_by_chrom <- theta_all_filt %>%
 ```
 
 ```
-   chromosome  n_windows total_sites  w_mean uw_mean  median      sd      q05     q95
-   <fct>           <int>       <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
- 1 NC_089312.1      1929    16465783 0.00242 0.00237 0.00231 0.00121 0.000532 0.00445
- 2 NC_089313.1      1238    10583414 0.00200 0.00196 0.00192 0.00103 0.000395 0.00374
- 3 NC_089314.1      1674    14327238 0.00242 0.00237 0.00232 0.00116 0.000626 0.00433
- 4 NC_089315.1      1711    14649218 0.00218 0.00214 0.00211 0.00108 0.000452 0.00391
- 5 NC_089316.1       699     5718524 0.00274 0.00266 0.00224 0.00176 0.000412 0.00583
- 6 NC_089317.1       954     8016663 0.00242 0.00237 0.00211 0.00152 0.000485 0.00516
- 7 NC_089318.1      1177     9919168 0.00183 0.00179 0.00170 0.00105 0.000247 0.00370
- 8 NC_089319.1      1303    11201350 0.00227 0.00222 0.00221 0.00112 0.000420 0.00414
- 9 NC_089320.1      1369    11700279 0.00216 0.00211 0.00202 0.00113 0.000403 0.00413
-10 NC_089321.1      1147     9734480 0.00226 0.00221 0.00210 0.00115 0.000491 0.00419
-11 NC_089322.1       741     6116158 0.00208 0.00202 0.00190 0.00129 0.000211 0.00443
-12 NC_089323.1       872     7254096 0.00213 0.00207 0.00187 0.00130 0.000237 0.00428
-13 NC_089324.1       918     7752971 0.00206 0.00200 0.00192 0.00113 0.000308 0.00401
-14 NC_089325.1      1229    10542673 0.00213 0.00209 0.00209 0.00104 0.000472 0.00382
+   chromosome  n_windows total_sites pooled_theta  w_mean uw_mean  median      sd      q05     q95
+   <fct>           <int>       <dbl>        <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+ 1 NC_089312.1      1929    16465783      0.00243 0.00242 0.00237 0.00231 0.00121 0.000532 0.00445
+ 2 NC_089313.1      1238    10583414      0.00201 0.00200 0.00196 0.00192 0.00103 0.000395 0.00374
+ 3 NC_089314.1      1674    14327238      0.00243 0.00242 0.00237 0.00232 0.00116 0.000626 0.00433
+ 4 NC_089315.1      1711    14649218      0.00219 0.00218 0.00214 0.00211 0.00108 0.000452 0.00391
+ 5 NC_089316.1       699     5718524      0.00276 0.00274 0.00266 0.00224 0.00176 0.000412 0.00583
+ 6 NC_089317.1       954     8016663      0.00243 0.00242 0.00237 0.00211 0.00152 0.000485 0.00516
+ 7 NC_089318.1      1177     9919168      0.00185 0.00183 0.00179 0.00170 0.00105 0.000247 0.00370
+ 8 NC_089319.1      1303    11201350      0.00228 0.00227 0.00222 0.00221 0.00112 0.000420 0.00414
+ 9 NC_089320.1      1369    11700279      0.00217 0.00216 0.00211 0.00202 0.00113 0.000403 0.00413
+10 NC_089321.1      1147     9734480      0.00227 0.00226 0.00221 0.00210 0.00115 0.000491 0.00419
+11 NC_089322.1       741     6116158      0.00210 0.00208 0.00202 0.00190 0.00129 0.000211 0.00443
+12 NC_089323.1       872     7254096      0.00215 0.00213 0.00207 0.00187 0.00130 0.000237 0.00428
+13 NC_089324.1       918     7752971      0.00207 0.00206 0.00200 0.00192 0.00113 0.000308 0.00401
+14 NC_089325.1      1229    10542673      0.00214 0.00213 0.00209 0.00209 0.00104 0.000472 0.00382
 ```
 
 <br>
 
 ```r
 # plot summary stats
-ggplot(theta_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
+ggplot(theta_sum_by_chrom, aes(x = chromosome, y = pooled_theta)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2) +
   labs(
@@ -952,17 +971,21 @@ ggplot(theta_sum_by_chrom, aes(x = chromosome, y = w_mean)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-![alt text](image-16.png)
+![alt text](image-31.png)
 
 <br>
 
-Genome-wide weighted means are 0.00210 and 0.00222 for pi and Watterson's theta, respectively.
+Genome-wide pooled diversity stats are 0.00211 and 0.00224 for pi and Watterson's theta, respectively.
 
 So θw is slightly larger than π, meaning Tajima's D is slightly negative at the whole-genome scale.
 
 θ > π suggests a slight excess of low-frequency variants. This could be the result of:
 - population expansion OR
 - purifying selection/background selection
+
+<br>
+
+Genome-wide diversity estimates were very similar whether calculated as pooled or weighted window-based means for π and Watterson’s θ, indicating that window filtering and denominator variation had little effect on aggregate estimates. Accordingly, the weighted mean Tajima’s D across retained 10 kb windows will be taken as a reliable summary of the genome-wide allele-frequency spectrum in the next step. A fully pooled genome-wide Tajima’s D cannot be reconstructed from window-level outputs because the variance term depends on the total number of segregating sites and sample size and is not additive across windows, and therefore would need to be recalculated from pooled site-level data rather than window-level summaries.
 
 <br>
 
@@ -984,7 +1007,7 @@ ggplot(pi_theta_merged, aes(x = avg_watterson_theta, y = avg_pi)) +
   theme_bw()
 ```
 
-π vs θw:
+π vs θw for all retained windows:
 ![alt text](image-17.png)
 
 Interpretation:
@@ -1154,9 +1177,9 @@ tajimad_sum_by_chrom <- tajimad_all_filt %>%
     n_windows = n(),
     total_sites = sum(no_sites),
     w_mean = weighted.mean(tajima_d, no_sites, na.rm = TRUE),  # weighted mean tajima's D
-    uw_mean = mean(tajima_d),                    # unweighted mean tajima's D
-    median = median(tajima_d),
-    sd = sd(tajima_d),
+    uw_mean = mean(tajima_d, na.rm = TRUE),                    # unweighted mean tajima's D
+    median = median(tajima_d, na.rm = TRUE),
+    sd = sd(tajima_d, na.rm = TRUE),
     q05 = quantile(tajima_d, 0.05, na.rm = TRUE),
     q95 = quantile(tajima_d, 0.95, na.rm = TRUE),
     .groups = "drop"
@@ -1164,22 +1187,22 @@ tajimad_sum_by_chrom <- tajimad_all_filt %>%
 ```
 
 ```
-   chromosome  n_windows total_sites  w_mean uw_mean median     sd   q05   q95
-   <fct>           <int>       <dbl>   <dbl>   <dbl>  <dbl>  <dbl> <dbl> <dbl>
- 1 NC_089312.1      1929    16465783 -0.262   NA     NA     NA     -1.35 0.896
- 2 NC_089313.1      1238    10583414 -0.0490  NA     NA     NA     -1.41 1.25 
- 3 NC_089314.1      1674    14327238 -0.123   -0.123 -0.141  0.641 -1.13 0.956
- 4 NC_089315.1      1711    14649218 -0.0253  NA     NA     NA     -1.30 1.32 
- 5 NC_089316.1       699     5718524 -0.587   NA     NA     NA     -1.40 0.281
- 6 NC_089317.1       954     8016663 -0.207   NA     NA     NA     -1.28 0.990
- 7 NC_089318.1      1177     9919168  0.0687  NA     NA     NA     -1.24 1.42 
- 8 NC_089319.1      1303    11201350 -0.159   NA     NA     NA     -1.46 1.05 
- 9 NC_089320.1      1369    11700279 -0.0692  NA     NA     NA     -1.31 1.12 
-10 NC_089321.1      1147     9734480 -0.124   NA     NA     NA     -1.18 1.03 
-11 NC_089322.1       741     6116158 -0.330   NA     NA     NA     -1.45 0.673
-12 NC_089323.1       872     7254096 -0.266   NA     NA     NA     -1.28 0.778
-13 NC_089324.1       918     7752971 -0.149   NA     NA     NA     -1.22 1.03 
-14 NC_089325.1      1229    10542673 -0.127   NA     NA     NA     -1.46 1.10
+   chromosome  n_windows total_sites  w_mean uw_mean    median    sd   q05   q95
+   <fct>           <int>       <dbl>   <dbl>   <dbl>     <dbl> <dbl> <dbl> <dbl>
+ 1 NC_089312.1      1929    16465783 -0.262  -0.265  -0.273    0.685 -1.35 0.896
+ 2 NC_089313.1      1238    10583414 -0.0490 -0.0443  0.000162 0.801 -1.41 1.25 
+ 3 NC_089314.1      1674    14327238 -0.123  -0.123  -0.141    0.641 -1.13 0.956
+ 4 NC_089315.1      1711    14649218 -0.0253 -0.0253 -0.0552   0.781 -1.30 1.32 
+ 5 NC_089316.1       699     5718524 -0.587  -0.589  -0.620    0.523 -1.40 0.281
+ 6 NC_089317.1       954     8016663 -0.207  -0.213  -0.258    0.696 -1.28 0.990
+ 7 NC_089318.1      1177     9919168  0.0687  0.0688  0.0702   0.782 -1.24 1.42 
+ 8 NC_089319.1      1303    11201350 -0.159  -0.153  -0.128    0.758 -1.46 1.05 
+ 9 NC_089320.1      1369    11700279 -0.0692 -0.0673 -0.0573   0.736 -1.31 1.12 
+10 NC_089321.1      1147     9734480 -0.124  -0.128  -0.174    0.661 -1.18 1.03 
+11 NC_089322.1       741     6116158 -0.330  -0.327  -0.342    0.666 -1.45 0.673
+12 NC_089323.1       872     7254096 -0.266  -0.267  -0.317    0.629 -1.28 0.778
+13 NC_089324.1       918     7752971 -0.149  -0.146  -0.159    0.692 -1.22 1.03 
+14 NC_089325.1      1229    10542673 -0.127  -0.126  -0.129    0.768 -1.46 1.10
 ```
 
 <br>
@@ -1208,11 +1231,11 @@ Make summary table of genome-wide stats for ALL comparison:
 ALL_summary <- tibble(
   population = "ALL",
   
-  pi = pi_sum$w_mean,
+  pi = pi_sum$pooled_pi,
   pi_q05 = pi_sum$q05,
   pi_q95 = pi_sum$q95,
   
-  theta = theta_sum$w_mean,
+  theta = theta_sum$pooled_theta,
   theta_q05 = theta_sum$q05,
   theta_q95 = theta_sum$q95,
   
@@ -1232,9 +1255,658 @@ ALL_summary_compact <- tibble(
 ```
 
 ```
-  population pi                        theta                     TajimasD             
-  ALL        0.00210 (0.00033–0.00418) 0.00222 (0.00041–0.00429) -0.149 (-1.320–1.068)
+  population pi (pooled)               theta (pooled)            TajimasD (weighted mean)             
+  ALL        0.00211 (0.00033–0.00418) 0.00224 (0.00041–0.00429) -0.149 (-1.320–1.068)
 ```
 
+<br>
+<br>
+
+### "Island" pixy run (Tutuila vs. Ofu)
+
+Now move on to the island-comparison files.
+
+#### Island-level pi
+Load pi files:
+```r
+# Pi files first
+
+# Load in files
+pi_island_files <- list.files(
+  "./island/",
+  pattern = "_pi.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(pi_island_files) <- pi_island_files
+
+# import and combine island pi files while creating new column with file path/name
+pi_island_raw <- map_dfr(pi_island_files, read_tsv, .id = "source_file")
+
+# reformatting
+pi_island <- pi_island_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(pi_island)
+```
+
+```
+tibble [70,472 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file      : chr [1:70472] "./island//NC_089312.1_Pverrucosa.island_pi.txt" "./island//NC_089312.1_Pverrucosa.island_pi.txt" "./island//NC_089312.1_Pverrucosa.island_pi.txt" "./island//NC_089312.1_Pverrucosa.island_pi.txt" ...
+ $ pop              : Factor w/ 2 levels "Ofu","Tutuila": 2 1 2 1 1 2 2 1 1 2 ...
+ $ chromosome       : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1     : num [1:70472] 1 1 10001 10001 20001 ...
+ $ window_pos_2     : num [1:70472] 10000 10000 20000 20000 30000 30000 40000 40000 50000 50000 ...
+ $ avg_pi           : num [1:70472] NA NA 0 0 0 ...
+ $ no_sites         : num [1:70472] 0 0 189 189 864 ...
+ $ count_diffs      : num [1:70472] NA NA 0 0 0 ...
+ $ count_comparisons: num [1:70472] NA NA 4191716 158647 773245 ...
+ $ count_missing    : num [1:70472] NA NA 444643 54545 201347 ...
+```
+
+<br>
+
+```r
+# plot distribution of callable sites per 10kb window
+ggplot(pi_island, aes(x = no_sites)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~ pop) +
+  labs(
+    x = "Number of callable sites per window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 10000, by = 2000)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
+# Distribution of callable sites looks same as before when split between islands. The main peak is still around 9000 sites, with most of the hump between 8000 and 10,000
+# This indicates good coverage of callable sites and allows us to set a lower end cutoff of 7000 (retaining windows with >= 70% of sites callable)
+# This removes low-information regions while retaining the majority of high-quality genomic windows
+```
+Distribution of callable sites by island (unfiltered):
+![alt text](image-23.png)
+Distribution of callable sites looks same as before when split between islands. The main peak is still around 9000 sites, with most of the hump between 8000 and 10,000.
+
+<br>
+
+Now filter windows using 7000-site cutoff:
+```r
+# filter dataset based on 7000 site cutoff
+pi_island_filt <- pi_island %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering
+pi_island %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+
+# sensitivity check: try other cutoffs to see how it changes number of retained windows
+pi_island %>%
+  summarise(
+    prop_6000 = mean(no_sites >= 6000),
+    prop_7000 = mean(no_sites >= 7000),
+    prop_8000 = mean(no_sites >= 8000)
+  )
+```
+```
+  total retained  prop
+  70472    33922 0.481
+
+  prop_6000 prop_7000 prop_8000
+      0.542     0.481     0.367
+```
+Decreasing cutoff to 6000 doesn't add that much more data (6%). Increasing to 8000 removes a significant chunk of data (11%). So 7000 still looks like the sweet spot.
+
+<br>
+
+```r
+# plot distribution of pi across filtered 10kb windows
+ggplot(pi_island_filt, aes(x = avg_pi, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  #facet_wrap(~ pop) +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-24.png)
+Tutuila and Ofu distributions are very similar.
+
+<br>
+
+```r
+# calculate full summary stats for genome-wide pi by island
+pi_sum_island <- pi_island_filt %>% 
+  group_by(pop) %>% 
+  summarise(
+    pooled_pi = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_pi, no_sites),
+    median = median(avg_pi),
+    sd = sd(avg_pi),
+    q05 = quantile(avg_pi, 0.05),
+    q95 = quantile(avg_pi, 0.95)
+  )
+# genome-wide weighted mean pi: Tutuila=0.00208, Ofu=0.00209
+```
+
+```
+# A tibble: 2 × 6
+  pop     pooled_pi  w_mean  median      sd      q05     q95
+  <fct>       <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+1 Ofu       0.00209 0.00209 0.00191 0.00119 0.000317 0.00419
+2 Tutuila   0.00209 0.00208 0.00191 0.00118 0.000318 0.00416
+```
+
+<br>
+
+```r
+wmean_pi_ofu <- pi_sum_island$w_mean[1]
+wmean_pi_tutuila <- pi_sum_island$w_mean[2]
+
+  # genome-wide weighted mean pi: Tutuila=0.0020840, Ofu=0.0020858
+
+pooled_pi_ofu <- pi_sum_island$pooled_pi[1]
+pooled_pi_tutuila <- pi_sum_island$pooled_pi[2]
+
+  # genome-wide pooled pi: Tutuila=0.0020890, Ofu=0.0020923
+```
+
+<br>
+
+```r
+# replot with weighted mean pi for each island
+ggplot(pi_island_filt, aes(x = avg_pi, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_pi_ofu, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = wmean_pi_tutuila, linetype = "dashed", color = "blue") +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+
+# Distribution is right-skewed with longer tail at higher values
+```
+![alt text](image-25.png)
+
+<br>
+
+```r
+# facet by chromosome and island (using pooled_pi_all as x-intercept for reference)
+ggplot(pi_island_filt, aes(x = avg_pi, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = pooled_pi_all, linetype = "dashed") +
+  facet_grid(pop ~ chromosome) +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-32.png)
+
+<br>
+
+```r
+# plot per-window pi across genome by island
+ggplot(pi_island_filt, aes(x = window_pos_1, y = avg_pi)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_grid(pop ~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "π"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-28.png)
+Some slight differences between islands, but overall very similar patterns.
+
+<br>
+
+```r
+# calculate pi and summary stats per chromosome
+pi_sum_by_chrom_island <- pi_island_filt %>%
+  group_by(pop, chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    w_mean = weighted.mean(avg_pi, no_sites),  # weighted mean pi
+    uw_mean = mean(avg_pi),                    # unweighted mean pi
+    median = median(avg_pi),
+    sd = sd(avg_pi),
+    q05 = quantile(avg_pi, 0.05),
+    q95 = quantile(avg_pi, 0.95),
+    .groups = "drop"
+  )
+```
+
+```
+   pop     chromosome  n_windows total_sites pooled_pi  w_mean uw_mean  median      sd      q05     q95
+   <fct>   <fct>           <int>       <dbl>     <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+ 1 Ofu     NC_089312.1      1929    16465783   0.00217 0.00217 0.00212 0.00206 0.00116 0.000374 0.00418
+ 2 Ofu     NC_089313.1      1238    10583414   0.00192 0.00192 0.00188 0.00176 0.00110 0.000311 0.00385
+ 3 Ofu     NC_089314.1      1674    14327238   0.00235 0.00235 0.00231 0.00220 0.00123 0.000453 0.00451
+ 4 Ofu     NC_089315.1      1711    14649218   0.00214 0.00213 0.00209 0.00199 0.00117 0.000346 0.00415
+ 5 Ofu     NC_089316.1       699     5718524   0.00215 0.00214 0.00208 0.00183 0.00135 0.000230 0.00455
+ 6 Ofu     NC_089317.1       954     8016663   0.00210 0.00210 0.00205 0.00193 0.00120 0.000363 0.00425
+ 7 Ofu     NC_089318.1      1177     9919168   0.00187 0.00187 0.00182 0.00168 0.00114 0.000210 0.00385
+ 8 Ofu     NC_089319.1      1303    11201350   0.00214 0.00214 0.00210 0.00204 0.00119 0.000354 0.00432
+ 9 Ofu     NC_089320.1      1369    11700279   0.00207 0.00207 0.00202 0.00187 0.00115 0.000330 0.00417
+10 Ofu     NC_089321.1      1147     9734480   0.00218 0.00217 0.00213 0.00201 0.00119 0.000397 0.00433
+11 Ofu     NC_089322.1       741     6116158   0.00178 0.00178 0.00173 0.00153 0.00118 0.000170 0.00409
+12 Ofu     NC_089323.1       872     7254096   0.00194 0.00193 0.00187 0.00165 0.00125 0.000162 0.00404
+13 Ofu     NC_089324.1       918     7752971   0.00200 0.00199 0.00193 0.00182 0.00116 0.000240 0.00406
+14 Ofu     NC_089325.1      1229    10542673   0.00212 0.00211 0.00207 0.00195 0.00116 0.000380 0.00408
+15 Tutuila NC_089312.1      1929    16465783   0.00220 0.00219 0.00215 0.00205 0.00117 0.000380 0.00424
+16 Tutuila NC_089313.1      1238    10583414   0.00196 0.00196 0.00192 0.00178 0.00113 0.000317 0.00399
+17 Tutuila NC_089314.1      1674    14327238   0.00229 0.00229 0.00225 0.00212 0.00117 0.000500 0.00431
+18 Tutuila NC_089315.1      1711    14649218   0.00215 0.00215 0.00211 0.00203 0.00116 0.000353 0.00411
+19 Tutuila NC_089316.1       699     5718524   0.00216 0.00216 0.00209 0.00187 0.00134 0.000245 0.00458
+20 Tutuila NC_089317.1       954     8016663   0.00218 0.00217 0.00212 0.00196 0.00124 0.000390 0.00433
+21 Tutuila NC_089318.1      1177     9919168   0.00186 0.00185 0.00181 0.00167 0.00112 0.000210 0.00384
+22 Tutuila NC_089319.1      1303    11201350   0.00215 0.00215 0.00211 0.00205 0.00120 0.000353 0.00429
+23 Tutuila NC_089320.1      1369    11700279   0.00210 0.00209 0.00205 0.00191 0.00118 0.000316 0.00424
+24 Tutuila NC_089321.1      1147     9734480   0.00215 0.00215 0.00210 0.00202 0.00116 0.000410 0.00415
+25 Tutuila NC_089322.1       741     6116158   0.00183 0.00183 0.00177 0.00162 0.00117 0.000182 0.00397
+26 Tutuila NC_089323.1       872     7254096   0.00193 0.00192 0.00186 0.00169 0.00121 0.000173 0.00396
+27 Tutuila NC_089324.1       918     7752971   0.00193 0.00193 0.00187 0.00176 0.00113 0.000223 0.00391
+28 Tutuila NC_089325.1      1229    10542673   0.00203 0.00202 0.00199 0.00186 0.00113 0.000331 0.00400
+```
+
+<br>
+
+
+```r
+# plot summary stats by chromosome and island
+ggplot(pi_sum_by_chrom_island, aes(x = chromosome, y = pooled_pi, color = pop)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = expression("pooled"~pi~"(window-based 5th-95th percentile range)")
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-33.png)
+
+<br>
+
+<br>
+
+#### Island-level theta
+
+```r
+# Now island theta files
+
+# Load in files
+theta_island_files <- list.files(
+  "./island/",
+  pattern = "_watterson_theta.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(theta_island_files) <- theta_island_files
+
+# import and combine island theta files while creating new column with file path/name
+theta_island_raw <- map_dfr(theta_island_files, read_tsv, .id = "source_file")
+
+# reformatting
+theta_island <- theta_island_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(theta_island)
+```
+
+```
+tibble [70,472 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file        : chr [1:70472] "./island//NC_089312.1_Pverrucosa.island_watterson_theta.txt" "./island//NC_089312.1_Pverrucosa.island_watterson_theta.txt" "./island//NC_089312.1_Pverrucosa.island_watterson_theta.txt" "./island//NC_089312.1_Pverrucosa.island_watterson_theta.txt" ...
+ $ pop                : Factor w/ 2 levels "Ofu","Tutuila": 2 1 2 1 1 2 2 1 1 2 ...
+ $ chromosome         : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1       : num [1:70472] 1 1 10001 10001 20001 ...
+ $ window_pos_2       : num [1:70472] 10000 10000 20000 20000 30000 30000 40000 40000 50000 50000 ...
+ $ avg_watterson_theta: num [1:70472] NA NA 0 0 0 ...
+ $ no_sites           : num [1:70472] 0 0 189 189 864 ...
+ $ raw_watterson_theta: num [1:70472] NA NA 0 0 0 ...
+ $ no_var_sites       : num [1:70472] 0 0 0 0 0 0 13 14 0 0 ...
+ $ weighted_no_sites  : num [1:70472] NA NA 181 170 762 ...
+```
+
+<br>
+
+Filter out low-data windows:
+```r
+# filter dataset based on 7000 site cutoff
+theta_island_filt <- theta_island %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering
+theta_island %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+```
+
+```r
+# plot distribution of theta across filtered 10kb windows
+ggplot(theta_island_filt, aes(x = avg_watterson_theta, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  #facet_wrap(~ pop) +
+  labs(
+    x = "Watterson's θ",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-34.png)
+Tutuila and Ofu theta distributions are more differentiated compared to pi. Ofu distribution shifted slightly right compared to Tutuila.
+
+<br>
+
+```r
+# calculate full summary stats for genome-wide theta by island
+theta_sum_island <- theta_island_filt %>% 
+  group_by(pop) %>% 
+  summarise(
+    pooled_theta = sum(raw_watterson_theta, na.rm = TRUE) / sum(weighted_no_sites, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_watterson_theta, no_sites),
+    median = median(avg_watterson_theta),
+    sd = sd(avg_watterson_theta),
+    q05 = quantile(avg_watterson_theta, 0.05),
+    q95 = quantile(avg_watterson_theta, 0.95)
+  )
+
+wmean_theta_ofu <- theta_sum_island$w_mean[1]
+wmean_theta_tutuila <- theta_sum_island$w_mean[2]
+
+# genome-wide weighted mean theta: Tutuila=0.0021526, Ofu=0.0023612
+
+pooled_theta_ofu <- theta_sum_island$pooled_theta[1]
+pooled_theta_tutuila <- theta_sum_island$pooled_theta[2]
+
+# genome-wide pooled theta: Tutuila=0.0021633, Ofu=0.0023754
+```
+
+```
+# replot with weighted mean theta for each island
+ggplot(theta_island_filt, aes(x = avg_watterson_theta, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_theta_ofu, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = wmean_theta_tutuila, linetype = "dashed", color = "blue") +
+  labs(
+    x = "Watterson's θ",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-35.png)
+Ofu distribution is shifted right compared to Tutuila.
+
+<br>
+
+```r
+# facet by chromosome and island (using pooled_theta_ofu/tutuila as x-intercept for reference)
+ggplot(pi_island_filt, aes(x = avg_pi, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = pooled_theta_ofu, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = pooled_theta_tutuila, linetype = "dashed", color = "blue") +
+  facet_grid(pop ~ chromosome) +
+  labs(
+    x = "Watterson's θ",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-36.png)
+
+<br>
+
+```r
+# plot per-window theta across genome by island
+ggplot(theta_island_filt, aes(x = window_pos_1, y = avg_watterson_theta)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_grid(pop ~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "θw"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-37.png)
+Mostly similar patterns, but some small differences between islands.
+
+<br>
+
+```r
+# calculate theta and summary stats per chromosome
+theta_sum_by_chrom_island <- theta_island_filt %>%
+  group_by(pop, chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    pooled_theta = sum(raw_watterson_theta, na.rm = TRUE) / sum(weighted_no_sites, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_watterson_theta, no_sites),  # weighted mean theta
+    uw_mean = mean(avg_watterson_theta),                    # unweighted mean theta
+    median = median(avg_watterson_theta),
+    sd = sd(avg_watterson_theta),
+    q05 = quantile(avg_watterson_theta, 0.05),
+    q95 = quantile(avg_watterson_theta, 0.95),
+    .groups = "drop"
+  )
+  ```
+
+  ```
+     pop     chromosome  n_windows total_sites pooled_theta  w_mean uw_mean  median       sd      q05     q95
+   <fct>   <fct>           <int>       <dbl>        <dbl>   <dbl>   <dbl>   <dbl>    <dbl>    <dbl>   <dbl>
+ 1 Ofu     NC_089312.1      1929    16465783      0.00254 0.00253 0.00248 0.00239 0.00129  0.000515 0.00473
+ 2 Ofu     NC_089313.1      1238    10583414      0.00216 0.00215 0.00210 0.00205 0.00112  0.000397 0.00410
+ 3 Ofu     NC_089314.1      1674    14327238      0.00265 0.00264 0.00259 0.00250 0.00130  0.000666 0.00486
+ 4 Ofu     NC_089315.1      1711    14649218      0.00237 0.00236 0.00231 0.00225 0.00118  0.000479 0.00434
+ 5 Ofu     NC_089316.1       699     5718524      0.00269 0.00267 0.00259 0.00226 0.00170  0.000340 0.00557
+ 6 Ofu     NC_089317.1       954     8016663      0.00246 0.00244 0.00239 0.00217 0.00144  0.000486 0.00485
+ 7 Ofu     NC_089318.1      1177     9919168      0.00200 0.00199 0.00193 0.00185 0.00113  0.000247 0.00395
+ 8 Ofu     NC_089319.1      1303    11201350      0.00239 0.00238 0.00233 0.00228 0.00120  0.000439 0.00442
+ 9 Ofu     NC_089320.1      1369    11700279      0.00234 0.00232 0.00227 0.00214 0.00120  0.000418 0.00442
+10 Ofu     NC_089321.1      1147     9734480      0.00244 0.00242 0.00237 0.00229 0.00126  0.000528 0.00461
+11 Ofu     NC_089322.1       741     6116158      0.00218 0.00216 0.00210 0.00191 0.00134  0.000221 0.00458
+12 Ofu     NC_089323.1       872     7254096      0.00223 0.00221 0.00214 0.00197 0.00139  0.000218 0.00464
+13 Ofu     NC_089324.1       918     7752971      0.00221 0.00220 0.00213 0.00207 0.00122  0.000308 0.00418
+14 Ofu     NC_089325.1      1229    10542673      0.00238 0.00237 0.00233 0.00230 0.00117  0.000504 0.00435
+15 Tutuila NC_089312.1      1929    16465783      0.00234 0.00233 0.00229 0.00221 0.00118  0.000489 0.00432
+16 Tutuila NC_089313.1      1238    10583414      0.00192 0.00192 0.00187 0.00184 0.000996 0.000368 0.00362
+17 Tutuila NC_089314.1      1674    14327238      0.00234 0.00233 0.00229 0.00223 0.00112  0.000600 0.00419
+18 Tutuila NC_089315.1      1711    14649218      0.00212 0.00211 0.00207 0.00202 0.00107  0.000433 0.00387
+19 Tutuila NC_089316.1       699     5718524      0.00270 0.00268 0.00260 0.00227 0.00173  0.000386 0.00568
+20 Tutuila NC_089317.1       954     8016663      0.00238 0.00236 0.00231 0.00203 0.00151  0.000458 0.00506
+21 Tutuila NC_089318.1      1177     9919168      0.00181 0.00180 0.00175 0.00168 0.00104  0.000244 0.00358
+22 Tutuila NC_089319.1      1303    11201350      0.00223 0.00222 0.00217 0.00214 0.00110  0.000427 0.00408
+23 Tutuila NC_089320.1      1369    11700279      0.00211 0.00210 0.00206 0.00196 0.00111  0.000377 0.00404
+24 Tutuila NC_089321.1      1147     9734480      0.00220 0.00218 0.00214 0.00205 0.00111  0.000455 0.00409
+25 Tutuila NC_089322.1       741     6116158      0.00204 0.00202 0.00196 0.00185 0.00126  0.000202 0.00436
+26 Tutuila NC_089323.1       872     7254096      0.00209 0.00208 0.00201 0.00184 0.00127  0.000245 0.00422
+27 Tutuila NC_089324.1       918     7752971      0.00198 0.00197 0.00191 0.00184 0.00108  0.000281 0.00380
+28 Tutuila NC_089325.1      1229    10542673      0.00204 0.00203 0.00199 0.00199 0.00100  0.000439 0.00367
+  ```
+
+  <br>
+
+  ```r
+# plot summary stats by chromosome and island
+ggplot(theta_sum_by_chrom_island, aes(x = chromosome, y = pooled_theta, color = pop)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = expression("pooled"~theta~"(window-based 5th-95th percentile range)")
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  ```
+  ![alt text](image-38.png)
+  Ofu theta pretty consistenty higher than Tutuila theta across chromosomes, with exception of Chromosom 316.1, which is one of the chromosomes with more missing data.
+
+<br>
+<br>
+
+#### Island-level Tajima's D
+
+```r
+# Now island Tajima's D files
+
+# Load in files
+tajimad_island_files <- list.files(
+  "./island/",
+  pattern = "_tajima_d.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(tajimad_island_files) <- tajimad_island_files
+
+# import and combine island tajimad files while creating new column with file path/name
+tajimad_island_raw <- map_dfr(tajimad_island_files, read_tsv, .id = "source_file")
+
+# reformatting
+tajimad_island <- tajimad_island_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(tajimad_island)
+```
+
+```
+tibble [70,472 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file        : chr [1:70472] "./island//NC_089312.1_Pverrucosa.island_tajima_d.txt" "./island//NC_089312.1_Pverrucosa.island_tajima_d.txt" "./island//NC_089312.1_Pverrucosa.island_tajima_d.txt" "./island//NC_089312.1_Pverrucosa.island_tajima_d.txt" ...
+ $ pop                : Factor w/ 2 levels "Ofu","Tutuila": 2 1 2 1 1 2 2 1 1 2 ...
+ $ chromosome         : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1       : num [1:70472] 1 1 10001 10001 20001 ...
+ $ window_pos_2       : num [1:70472] 10000 10000 20000 20000 30000 30000 40000 40000 50000 50000 ...
+ $ tajima_d           : num [1:70472] NA NA NA NA NA ...
+ $ no_sites           : num [1:70472] 0 0 189 189 864 ...
+ $ raw_pi             : num [1:70472] NA NA 0 0 0 ...
+ $ raw_watterson_theta: num [1:70472] NA NA 0 0 0 ...
+ $ tajima_d_stdev     : num [1:70472] NA NA 0 0 0 ...
+```
+
+<br>
+
+```r
+# filter dataset based on 7000 site cutoff
+tajimad_island_filt <- tajimad_island %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering
+tajimad_island %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+```
+
+```
+  total retained  prop
+  <int>    <int> <dbl>
+  70472    33922 0.481
+```
+
+<br>
+
+```r
+# plot distribution of tajimad across filtered 10kb windows
+ggplot(tajimad_island_filt, aes(x = tajima_d, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  #facet_wrap(~ pop) +
+  labs(
+    x = "Tajima's D",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-39.png)
+Tutuila and Ofu Tajima's D distributions are differentiated similar to theta. Ofu distribution shifted left (more negative) compared to Tutuila.
+
+<br>
+
+Count NAs:
+```r
+# determine how many NAs in dataset (windows where pi and theta were both 0 (invariant regions), so Tajima's D is undefined)
+tajimad_island_filt %>% filter(pop == "Ofu") %>% filter(is.na(tajima_d)) %>% nrow()
+tajimad_island_filt %>% filter(pop == "Tutuila") %>% filter(is.na(tajima_d)) %>% nrow()
+```
+
+```
+71
+49
+```
+71 and 49 windows have tajima_d = NA for the Ofu and Tutuila subsets, respectively.
+
+<br>
+
+```r
+# calculate full summary stats for genome-wide tajimad by island
+tajimad_sum_island <- tajimad_island_filt %>% 
+  group_by(pop) %>% 
+  summarise(
+    w_mean = weighted.mean(tajima_d, no_sites, na.rm = TRUE), # have to rely on weighted means here because Tajima's D cannot be pooled across windows like pi and theta
+    median = median(tajima_d, na.rm = TRUE),
+    sd = sd(tajima_d, na.rm = TRUE),
+    q05 = quantile(tajima_d, 0.05, na.rm = TRUE),
+    q95 = quantile(tajima_d, 0.95, na.rm = TRUE)
+  )
+
+wmean_tajimad_ofu <- tajimad_sum_island$w_mean[1]
+wmean_tajimad_tutuila <- tajimad_sum_island$w_mean[2]
+
+# genome-wide weighted mean tajimad: Tutuila=-0.07674, Ofu=-0.40812
+```
+
+```
+  pop      w_mean  median    sd   q05   q95
+  <fct>     <dbl>   <dbl> <dbl> <dbl> <dbl>
+1 Ofu     -0.408  -0.413  0.723 -1.60 0.792
+2 Tutuila -0.0767 -0.0952 0.756 -1.29 1.20 
+```
+Weighted mean Tajima's D is more negative for Ofu samples than Tutuila.
+
+<br>
+
+```r
+# replot with weighted mean tajimad for each island
+ggplot(tajimad_island_filt, aes(x = tajima_d, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_tajimad_ofu, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = wmean_tajimad_tutuila, linetype = "dashed", color = "blue") +
+  labs(
+    x = "Tajima's D",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-40.png)
+
+
+**Interpretation**: Sample size differences would bias θ downward in Ofu and Tajima’s D upward, but the observed pattern shows the opposite trend, indicating that the signal is unlikely to be driven by sampling effects alone. Ofu shows a relative excess of low-frequency (rare) alleles, indicative of more recent/intense expansion/founding or stronger purifying/background selection.
