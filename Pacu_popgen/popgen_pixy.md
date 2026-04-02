@@ -1909,4 +1909,4 @@ ggplot(tajimad_island_filt, aes(x = tajima_d, fill = pop)) +
 ![alt text](image-40.png)
 
 
-**Interpretation**: A larger theta and more negative Tajima's D means Ofu shows a relative excess of low-frequency (rare) alleles, indicative of more recent/intense expansion/founding or stronger purifying/background selection. Sample size differences between Ofu (24) and Tutuila (111) would be expected to bias θ downward in Ofu and Tajima’s D upward, but the observed pattern shows the opposite trend, indicating that the signal is unlikely to be driven by sampling effects alone.
+**Interpretation**: A larger theta and more negative Tajima's D means Ofu shows an excess of low-frequency (rare) alleles (relative to expectations under neutrality) that is more extreme than that seen in the Tutuila sample set, indicative of more recent/intense expansion/founding or stronger purifying/background selection. Sample size differences between Ofu (24) and Tutuila (111) would be expected to bias θ downward in Ofu and Tajima’s D upward, but the observed pattern shows the opposite trend, indicating that the signal is unlikely to be driven by sampling effects alone.
