@@ -1664,7 +1664,7 @@ Ofu distribution is shifted right compared to Tutuila.
 
 ```r
 # facet by chromosome and island (using pooled_theta_ofu/tutuila as x-intercept for reference)
-ggplot(pi_island_filt, aes(x = avg_pi, fill = pop)) +
+ggplot(theta_island_filt, aes(x = avg_watterson_theta, fill = pop)) +
   geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
   geom_vline(xintercept = pooled_theta_ofu, linetype = "dashed", color = "red") +
   geom_vline(xintercept = pooled_theta_tutuila, linetype = "dashed", color = "blue") +
@@ -1676,7 +1676,8 @@ ggplot(pi_island_filt, aes(x = avg_pi, fill = pop)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
-![alt text](image-36.png)
+![alt text](plot_zoom_png.png)
+
 
 <br>
 
@@ -1909,4 +1910,177 @@ ggplot(tajimad_island_filt, aes(x = tajima_d, fill = pop)) +
 ![alt text](image-40.png)
 
 
-**Interpretation**: A larger theta and more negative Tajima's D means Ofu shows an excess of low-frequency (rare) alleles (relative to expectations under neutrality) that is more extreme than that seen in the Tutuila sample set, indicative of more recent/intense expansion/founding or stronger purifying/background selection. Sample size differences between Ofu (24) and Tutuila (111) would be expected to bias θ downward in Ofu and Tajima’s D upward, but the observed pattern shows the opposite trend, indicating that the signal is unlikely to be driven by sampling effects alone.
+**Interpretation**: A larger theta and more negative Tajima's D means Ofu shows an excess of low-frequency (rare) alleles (relative to expectations under neutrality) that is more extreme than that seen in the Tutuila sample set, indicative of more recent/intense expansion or founding event (e.g., after large disturbance event?) or stronger purifying/background selection. Sample size differences between Ofu (24) and Tutuila (111) would be expected to bias θ downward in Ofu and Tajima’s D upward, but the observed pattern shows the opposite trend, indicating that the signal is unlikely to be driven by sampling effects alone.
+
+<br>
+
+```r
+# Double check callable sites by island
+tajimad_island_filt %>%
+  group_by(pop) %>%
+  summarise(mean_sites = mean(no_sites))
+  ```
+  ```
+    pop     mean_sites
+  1 Ofu          8489.
+  2 Tutuila      8489.
+  ```
+Mean number of callable sites is identical (8489) across islands.
+
+<br>
+
+```r
+# facet by chromosome and island (using wmean_tajimad_ofu/tutuila as x-intercept for reference)
+ggplot(tajimad_island_filt, aes(x = tajima_d, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_tajimad_ofu, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = wmean_tajimad_tutuila, linetype = "dashed", color = "blue") +
+  facet_grid(pop ~ chromosome) +
+  labs(
+    x = "Tajima's D",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-41.png)
+Difference between Ofu and Tutuila is slightly more pronounced in some chromosomes than others, but overall pretty consistent negative shift in Ofu across all chromosomes.
+
+<br>
+
+```r
+# plot per-window tajimad across genome by island
+ggplot(tajimad_island_filt, aes(x = window_pos_1, y = tajima_d)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_grid(pop ~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Tajima's D"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-42.png)
+
+<br>
+
+```r
+# calculate tajimad and summary stats per chromosome
+tajimad_sum_by_chrom_island <- tajimad_island_filt %>%
+  group_by(pop, chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    w_mean = weighted.mean(tajima_d, no_sites, na.rm = TRUE),  # have to rely on weighted means here because Tajima's D cannot be pooled across windows like pi and theta
+    uw_mean = mean(tajima_d, na.rm = TRUE),                    # unweighted mean theta
+    median = median(tajima_d, na.rm = TRUE),
+    sd = sd(tajima_d, na.rm = TRUE),
+    q05 = quantile(tajima_d, 0.05, na.rm = TRUE),
+    q95 = quantile(tajima_d, 0.95, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+```
+   pop     chromosome  n_windows total_sites  w_mean uw_mean  median    sd   q05   q95
+   <fct>   <fct>           <int>       <dbl>   <dbl>   <dbl>   <dbl> <dbl> <dbl> <dbl>
+ 1 Ofu     NC_089312.1      1929    16465783 -0.496  -0.495  -0.502  0.715 -1.66 0.696
+ 2 Ofu     NC_089313.1      1238    10583414 -0.385  -0.377  -0.368  0.777 -1.76 0.888
+ 3 Ofu     NC_089314.1      1674    14327238 -0.399  -0.398  -0.405  0.672 -1.45 0.683
+ 4 Ofu     NC_089315.1      1711    14649218 -0.343  -0.341  -0.351  0.770 -1.62 0.916
+ 5 Ofu     NC_089316.1       699     5718524 -0.670  -0.671  -0.697  0.554 -1.49 0.288
+ 6 Ofu     NC_089317.1       954     8016663 -0.451  -0.452  -0.444  0.657 -1.48 0.636
+ 7 Ofu     NC_089318.1      1177     9919168 -0.212  -0.208  -0.205  0.788 -1.44 1.07 
+ 8 Ofu     NC_089319.1      1303    11201350 -0.370  -0.361  -0.334  0.778 -1.69 0.928
+ 9 Ofu     NC_089320.1      1369    11700279 -0.395  -0.392  -0.385  0.758 -1.67 0.868
+10 Ofu     NC_089321.1      1147     9734480 -0.374  -0.373  -0.389  0.646 -1.45 0.718
+11 Ofu     NC_089322.1       741     6116158 -0.605  -0.599  -0.569  0.675 -1.87 0.440
+12 Ofu     NC_089323.1       872     7254096 -0.445  -0.442  -0.473  0.661 -1.53 0.675
+13 Ofu     NC_089324.1       918     7752971 -0.337  -0.331  -0.290  0.683 -1.50 0.748
+14 Ofu     NC_089325.1      1229    10542673 -0.406  -0.404  -0.393  0.733 -1.68 0.800
+15 Tutuila NC_089312.1      1929    16465783 -0.172  -0.175  -0.179  0.724 -1.33 1.03 
+16 Tutuila NC_089313.1      1238    10583414  0.0703  0.0753  0.123  0.859 -1.44 1.44 
+17 Tutuila NC_089314.1      1674    14327238 -0.0406 -0.0401 -0.0664 0.682 -1.12 1.09 
+18 Tutuila NC_089315.1      1711    14649218  0.0624  0.0616  0.0297 0.809 -1.21 1.43 
+19 Tutuila NC_089316.1       699     5718524 -0.555  -0.557  -0.578  0.541 -1.42 0.324
+20 Tutuila NC_089317.1       954     8016663 -0.130  -0.136  -0.163  0.719 -1.24 1.15 
+21 Tutuila NC_089318.1      1177     9919168  0.0989  0.0990  0.104  0.795 -1.20 1.42 
+22 Tutuila NC_089319.1      1303    11201350 -0.117  -0.111  -0.0657 0.783 -1.49 1.19 
+23 Tutuila NC_089320.1      1369    11700279 -0.0139 -0.0109 -0.0353 0.768 -1.33 1.23 
+24 Tutuila NC_089321.1      1147     9734480 -0.0545 -0.0579 -0.0813 0.698 -1.19 1.14 
+25 Tutuila NC_089322.1       741     6116158 -0.261  -0.256  -0.260  0.684 -1.45 0.818
+26 Tutuila NC_089323.1       872     7254096 -0.222  -0.223  -0.257  0.643 -1.24 0.825
+27 Tutuila NC_089324.1       918     7752971 -0.0576 -0.0568 -0.0603 0.719 -1.17 1.22 
+28 Tutuila NC_089325.1      1229    10542673 -0.0401 -0.0405 -0.0709 0.789 -1.42 1.26 
+```
+
+<br>
+
+```r
+# plot summary stats by chromosome and island
+ggplot(tajimad_sum_by_chrom_island, aes(x = chromosome, y = w_mean, color = pop)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = "Weighted mean Tajima's D (window-based 5th-95th percentile range)"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-43.png)
+
+<br>
+
+```r
+# Make summary table of island-level stats for "island" comparison
+# report pooled stats (or weighted mean for Tajima's D) + window-derived 5-95% quantile range
+
+island_summary <- pi_sum_island %>%
+  select(pop, pooled_pi, q05, q95) %>%
+  rename(
+    population = pop,
+    pi_q05 = q05,
+    pi_q95 = q95
+  ) %>%
+  left_join(
+    theta_sum_island %>%
+      select(pop, pooled_theta, q05, q95) %>%
+      rename(
+        population = pop,
+        theta_q05 = q05,
+        theta_q95 = q95
+      ),
+    by = "population"
+  ) %>%
+  left_join(
+    tajimad_sum_island %>%
+      select(pop, w_mean, q05, q95) %>%
+      rename(
+        population = pop,
+        wmean_TajimasD = w_mean,
+        TajimasD_q05 = q05,
+        TajimasD_q95 = q95
+      ),
+    by = "population"
+  )
+
+
+# more readable compact version
+island_summary_compact <- island_summary %>%
+  transmute(
+    population,
+    pi = sprintf("%.5f (%.5f–%.5f)", pooled_pi, pi_q05, pi_q95),
+    theta = sprintf("%.5f (%.5f–%.5f)", pooled_theta, theta_q05, theta_q95),
+    TajimasD = sprintf("%.3f (%.3f–%.3f)", wmean_TajimasD, TajimasD_q05, TajimasD_q95)
+  )
+```
+
+```
+  population pi                        theta                     TajimasD             
+1 Ofu        0.00209 (0.00032–0.00419) 0.00238 (0.00041–0.00456) -0.408 (-1.598–0.792)
+2 Tutuila    0.00209 (0.00032–0.00416) 0.00216 (0.00039–0.00417) -0.077 (-1.293–1.199)
+```
+
+<br>
