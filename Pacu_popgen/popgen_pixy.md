@@ -2759,7 +2759,71 @@ Tajima's D more variable across locations than pi (-0.831 to -0.212; OFU6 most n
 
 <br>
 
+```r
+# facet by chromosome and location (using wmean_tajimad_all as x-intercept for reference)
+ggplot(tajimad_location_filt, aes(x = tajima_d, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_tajimad_all, linetype = "dashed") +
+  facet_grid(pop ~ chromosome) +
+  labs(
+    x = "Tajima's D",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-63.png)
 
+<br>
+
+```r
+# plot per-window tajimad across genome by location
+ggplot(tajimad_location_filt, aes(x = window_pos_1, y = tajima_d)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_grid(pop ~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Tajima's D"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-64.png)
+
+<br>
+
+```r
+# calculate tajimad and summary stats per chromosome
+tajimad_sum_by_chrom_location <- tajimad_location_filt %>%
+  group_by(pop, chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    w_mean = weighted.mean(tajima_d, no_sites, na.rm = TRUE),  # have to rely on weighted means here because Tajima's D cannot be pooled across windows like pi and theta
+    uw_mean = mean(tajima_d, na.rm = TRUE),                    # unweighted mean theta
+    median = median(tajima_d, na.rm = TRUE),
+    sd = sd(tajima_d, na.rm = TRUE),
+    q05 = quantile(tajima_d, 0.05, na.rm = TRUE),
+    q95 = quantile(tajima_d, 0.95, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# plot summary stats by chromosome and location
+ggplot(tajimad_sum_by_chrom_location, aes(x = chromosome, y = w_mean, color = pop)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = "Tajima's D (window-based 5th-95th percentile range)"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-65.png)
+OFU6 consistently most negative, FTEL consistently least negative (except first chromosome, where it is second least negative).
+
+<br>
 
 
 
