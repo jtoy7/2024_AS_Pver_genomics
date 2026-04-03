@@ -2084,3 +2084,113 @@ island_summary_compact <- island_summary %>%
 ```
 
 <br>
+
+<br>
+
+### "Location" pixy run (location-level summaries and comparisons)
+
+Now move on to the sampling location-comparison files.
+
+#### Location-level pi
+Load pi files:
+
+```r
+# Pi files first
+
+# Load in files
+pi_location_files <- list.files(
+  "./location/",
+  pattern = "_pi.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(pi_location_files) <- pi_location_files
+
+# import and combine location pi files while creating new column with file path/name
+pi_location_raw <- map_dfr(pi_location_files, read_tsv, .id = "source_file")
+
+# reformatting
+pi_location <- pi_location_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(pi_location)
+```
+
+```
+tibble [352,360 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file      : chr [1:352360] "./location//NC_089312.1_Pverrucosa.location_pi.txt" "./location//NC_089312.1_Pverrucosa.location_pi.txt" "./location//NC_089312.1_Pverrucosa.location_pi.txt" "./location//NC_089312.1_Pverrucosa.location_pi.txt" ...
+ $ pop              : Factor w/ 10 levels "ALOF","AOAA",..: 1 2 3 4 6 5 8 7 10 9 ...
+ $ chromosome       : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1     : num [1:352360] 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_2     : num [1:352360] 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 ...
+ $ avg_pi           : num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+ $ no_sites         : num [1:352360] 0 0 0 0 0 0 0 0 0 0 ...
+ $ count_diffs      : num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+ $ count_comparisons: num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+ $ count_missing    : num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+```
+
+<br>
+
+```
+# plot distribution of callable sites per 10kb window
+ggplot(pi_location, aes(x = no_sites)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = 7000, linetype = "dashed") +  # cutoff I've been using for previous pixy runs
+  facet_wrap(~ pop) +
+  labs(
+    x = "Number of callable sites per window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 10000, by = 2000)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-45.png)
+
+<br>
+
+```r
+# filter dataset based on 7000 site cutoff
+pi_location_filt <- pi_location %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering
+pi_location %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+```
+
+```
+   total retained  prop
+1 352360   169610 0.481
+```
+
+<br>
+
+```r
+# sensitivity check: try other cutoffs to see how it changes number of retained windows
+pi_location %>%
+  summarise(
+    prop_6000 = mean(no_sites >= 6000),
+    prop_7000 = mean(no_sites >= 7000),
+    prop_8000 = mean(no_sites >= 8000)
+  )
+```
+
+```
+  prop_6000 prop_7000 prop_8000
+      <dbl>     <dbl>     <dbl>
+1     0.542     0.481     0.367
+```
+Decreasing cutoff to 6000 doesn't add that much more data (6%). Increasing to 8000 removes a significant chunk of data (11%). So 7000 still looks like the sweet spot.
+
+<br>
+
