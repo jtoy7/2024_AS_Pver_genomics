@@ -2757,6 +2757,8 @@ tajimad_sum_location %>% arrange(desc(w_mean))
 ```
 Tajima's D more variable across locations than pi (-0.831 to -0.212; OFU6 most negative, FTEL least negative).
 
+Interestingly, the estimates for Tajima's D for OFU3 and OFU6 are both more negative than the value for Ofu in the "island"-level pixy run (D = -0.408). This is probably because Tajima's D is dependent on the number of segregating sites and sample size, both of which change when moving from location level to island level. These aggregate Tajima's D estimates are also calculated as weighted means, not pooled recalculated values like for pi and theta.
+
 <br>
 
 ```r
@@ -2843,6 +2845,108 @@ OFU6 consistently most negative, FTEL consistently least negative (except first 
 
 <br>
 
+```r
+# Make summary table of location-level stats for "location" comparison
+# report pooled stats (or weighted mean for Tajima's D) + window-derived 5-95% quantile range
+
+location_summary <- pi_sum_location %>%
+  select(pop, pooled_pi, q05, q95) %>%
+  rename(
+    population = pop,
+    pi_q05 = q05,
+    pi_q95 = q95
+  ) %>%
+  left_join(
+    theta_sum_location %>%
+      select(pop, pooled_theta, q05, q95) %>%
+      rename(
+        population = pop,
+        theta_q05 = q05,
+        theta_q95 = q95
+      ),
+    by = "population"
+  ) %>%
+  left_join(
+    tajimad_sum_location %>%
+      select(pop, w_mean, q05, q95) %>%
+      rename(
+        population = pop,
+        wmean_TajimasD = w_mean,
+        TajimasD_q05 = q05,
+        TajimasD_q95 = q95
+      ),
+    by = "population"
+  )
+
+
+# more readable compact version
+location_summary_compact <- location_summary %>%
+  transmute(
+    population,
+    pi = sprintf("%.5f (%.5f–%.5f)", pooled_pi, pi_q05, pi_q95),
+    theta = sprintf("%.5f (%.5f–%.5f)", pooled_theta, theta_q05, theta_q95),
+    TajimasD = sprintf("%.3f (%.3f–%.3f)", wmean_TajimasD, TajimasD_q05, TajimasD_q95)
+  ) %>% 
+  arrange(TajimasD)
+```
+
+```
+   population pi                        theta                     TajimasD                            
+ 1 FTEL       0.00201 (0.00030–0.00407) 0.00215 (0.00036–0.00414) -0.212 (-1.543–1.087)
+ 2 VATI       0.00203 (0.00029–0.00414) 0.00228 (0.00038–0.00440) -0.409 (-1.770–0.879)
+ 3 OFU3       0.00206 (0.00030–0.00415) 0.00233 (0.00039–0.00445) -0.426 (-1.688–0.803)
+ 4 AOAA       0.00210 (0.00029–0.00426) 0.00239 (0.00040–0.00461) -0.467 (-1.817–0.755)
+ 5 ALOF       0.00207 (0.00031–0.00414) 0.00241 (0.00041–0.00467) -0.507 (-1.749–0.700)
+ 6 LEON       0.00206 (0.00030–0.00417) 0.00241 (0.00040–0.00466) -0.544 (-1.798–0.669)
+ 7 FALU       0.00209 (0.00031–0.00420) 0.00246 (0.00041–0.00474) -0.556 (-1.782–0.653)
+ 8 MALO       0.00203 (0.00030–0.00416) 0.00241 (0.00040–0.00464) -0.657 (-2.033–0.583)
+ 9 FASA       0.00204 (0.00028–0.00420) 0.00242 (0.00039–0.00466) -0.683 (-2.139–0.606)
+10 OFU6       0.00213 (0.00030–0.00434) 0.00262 (0.00043–0.00510) -0.831 (-2.180–0.401)
+```
+
+<br>
+
+```r
+# plot theta vs pi by location
+ggplot(location_summary, aes(x = pooled_pi, y = pooled_theta)) +
+  geom_smooth(method = "lm", color = "black", linetype = "dashed", linewidth = 0.75, fill = "grey85") +
+  geom_point(aes(color = population), size = 3, show.legend = FALSE) +
+  geom_text_repel(aes(label = population), size = 3, point.padding = 0.5, box.padding = 0.4) +
+  theme_bw()
+  
+# plot Tajima's D vs pi by location
+ggplot(location_summary, aes(x = pooled_pi, y = wmean_TajimasD)) +
+  geom_smooth(method = "lm", color = "black", linetype = "dashed", linewidth = 0.75, fill = "grey85") +
+  geom_point(aes(color = population), size = 3, show.legend = FALSE) +
+  geom_text_repel(aes(label = population), size = 3, point.padding = 0.5, box.padding = 0.4) +
+  theme_bw()
+
+# plot Tajima's D vs theta by location
+ggplot(location_summary, aes(x = pooled_theta, y = wmean_TajimasD)) +
+  geom_smooth(method = "lm", color = "black", linetype = "dashed", linewidth = 0.75, fill = "grey85") +
+  geom_point(aes(color = population), size = 3, show.legend = FALSE) +
+  geom_text_repel(aes(label = population), size = 3, point.padding = 0.5, box.padding = 0.4) +
+  theme_bw()
+```
+
+![alt text](image-67.png)
+![alt text](image-68.png)
+![alt text](image-69.png)
+
+<br>
+
+
+**Takeaways so far**:
+- There is no meaningful difference in nucleotide diversity (π) between islands (or locations).
+  - This indicates that long-term effective population size (Ne) is similar between islands
+  - So likely no major bottlenecks in one island or strong long-term isolation-driven differences
+- θ is consistently greater than π across subgroups and chromosomes
+  - Creates weakly negative Tajima's D (excess of rare alleles)
+  - This is consitent across the genome so likely indicates:
+    - background selection
+    - mild population expansion/recovery after disturbance
+    - or subtle structure effects
+  
 
 
 
