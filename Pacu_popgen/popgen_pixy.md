@@ -2760,6 +2760,24 @@ Tajima's D more variable across locations than pi (-0.831 to -0.212; OFU6 most n
 <br>
 
 ```r
+# plot summary stats by location
+ggplot(tajimad_sum_location, aes(x = fct_reorder(pop, w_mean), y = w_mean, color = pop)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = "Tajima's D (window-based 5th-95th percentile range)"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-66.png)
+
+OFU6, FASA, and MALO, have the three lowest sample sizes, which you would expect to deflate theta and push Tajima's D more positive, but we see the opposite here: These three sites have the most negative Tajima's D values of all sites.
+
+<br>
+
+```r
 # facet by chromosome and location (using wmean_tajimad_all as x-intercept for reference)
 ggplot(tajimad_location_filt, aes(x = tajima_d, fill = pop)) +
   geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
