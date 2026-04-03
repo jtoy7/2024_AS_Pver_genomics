@@ -1110,11 +1110,11 @@ Distribution is pretty normal and symmetric, but slightly skewed so that the wei
 
 ```r
 # calculate full summary stats for genome-wide Tajima's D
-tajimad_all_filt %>%
+tajimad_sum <- tajimad_all_filt %>%
   summarise(
     w_mean = weighted.mean(tajima_d, no_sites, na.rm = TRUE),
-    median = median(tajima_d),
-    sd = sd(tajima_d),
+    median = median(tajima_d, na.rm = TRUE),
+    sd = sd(tajima_d, na.rm = TRUE),
     q05 = quantile(tajima_d, 0.05, na.rm = TRUE),
     q95 = quantile(tajima_d, 0.95, na.rm = TRUE)
   )
@@ -1123,7 +1123,7 @@ tajimad_all_filt %>%
 ```
   w_mean median    sd   q05   q95
    <dbl>  <dbl> <dbl> <dbl> <dbl>
-  -0.149     NA    NA -1.32  1.07
+  -0.149 -0.165 0.726 -1.32  1.07
 ```
 
 <br>
@@ -2193,4 +2193,574 @@ pi_location %>%
 Decreasing cutoff to 6000 doesn't add that much more data (6%). Increasing to 8000 removes a significant chunk of data (11%). So 7000 still looks like the sweet spot.
 
 <br>
+
+```r
+# confirm number of windows remaining for each location
+table(pi_location_filt$pop)
+```
+
+```
+ALOF  AOAA  FALU  FASA  FTEL  LEON  MALO  OFU3  OFU6  VATI 
+16961 16961 16961 16961 16961 16961 16961 16961 16961 16961
+```
+
+<br>
+
+```r
+# plot distribution of pi across filtered 10kb windows
+ggplot(pi_location_filt, aes(x = avg_pi, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  facet_wrap(~ pop) +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+
+ggplot(pi_location_filt, aes(x = avg_pi, color = pop)) +
+  geom_density(alpha = 0.5, position = "identity") +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-48.png)
+![alt text](image-47.png)
+Distributions pretty similar across locations.
+
+<br>
+
+```r
+# calculate full summary stats for genome-wide pi by location
+pi_sum_location <- pi_location_filt %>% 
+  group_by(pop) %>% 
+  summarise(
+    pooled_pi = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_pi, no_sites),
+    median = median(avg_pi),
+    sd = sd(avg_pi),
+    q05 = quantile(avg_pi, 0.05),
+    q95 = quantile(avg_pi, 0.95)
+  )
+
+pi_sum_location %>% arrange(desc(pooled_pi))
+```
+
+```
+   pop   pooled_pi  w_mean  median      sd      q05     q95
+ 1 OFU6    0.00213 0.00212 0.00194 0.00125 0.000305 0.00434
+ 2 AOAA    0.00210 0.00210 0.00192 0.00123 0.000295 0.00426
+ 3 FALU    0.00209 0.00208 0.00191 0.00120 0.000313 0.00420
+ 4 ALOF    0.00207 0.00207 0.00190 0.00119 0.000306 0.00414
+ 5 LEON    0.00206 0.00206 0.00189 0.00119 0.000297 0.00417
+ 6 OFU3    0.00206 0.00205 0.00188 0.00118 0.000303 0.00415
+ 7 FASA    0.00204 0.00203 0.00184 0.00120 0.000277 0.00420
+ 8 VATI    0.00203 0.00203 0.00185 0.00119 0.000285 0.00414
+ 9 MALO    0.00203 0.00203 0.00184 0.00119 0.000295 0.00416
+10 FTEL    0.00201 0.00200 0.00184 0.00116 0.000296 0.00407
+```
+Similar pi across all locations (0.00201-0.00213)
+
+<br>
+
+```r
+# facet by chromosome and location (using pooled_pi_all as x-intercept for reference)
+ggplot(pi_location_filt, aes(x = avg_pi, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = pooled_pi_all, linetype = "dashed") +
+  facet_grid(pop ~ chromosome) +
+  labs(
+    x = "Nucleotide diversity (π)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-49.png)
+
+<br>
+
+```r
+# plot per-window pi across genome by location
+ggplot(pi_location_filt, aes(x = window_pos_1, y = avg_pi)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_grid(pop ~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "π"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-50.png)
+
+<br>
+
+```r
+# calculate pi and summary stats per chromosome
+pi_sum_by_chrom_location <- pi_location_filt %>%
+  group_by(pop, chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    pooled_pi = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_pi, no_sites),  # weighted mean pi
+    uw_mean = mean(avg_pi),                    # unweighted mean pi
+    median = median(avg_pi),
+    sd = sd(avg_pi),
+    q05 = quantile(avg_pi, 0.05),
+    q95 = quantile(avg_pi, 0.95),
+    .groups = "drop"
+  )
+
+
+# plot summary stats by chromosome and location
+ggplot(pi_sum_by_chrom_location, aes(x = chromosome, y = pooled_pi, color = pop)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = expression("pooled"~pi~"(window-based 5th-95th percentile range)")
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-51.png)
+No single location or chromosome stands out as particularly divergent from the rest, consistent with similar pi across all locations. Ofu6 pretty consistently among greatest pi across chromosomes, but some variation.
+
+<br>
+<br>
+
+#### Location-level theta
+
+```r
+# Now theta files (location run)
+
+# Load in files
+theta_location_files <- list.files(
+  "./location/",
+  pattern = "_watterson_theta.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(theta_location_files) <- theta_location_files
+
+# import and combine location theta files while creating new column with file path/name
+theta_location_raw <- map_dfr(theta_location_files, read_tsv, .id = "source_file")
+
+# reformatting
+theta_location <- theta_location_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(theta_location)
+```
+
+```
+tibble [352,360 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file        : chr [1:352360] "./location//NC_089312.1_Pverrucosa.location_watterson_theta.txt" "./location//NC_089312.1_Pverrucosa.location_watterson_theta.txt" "./location//NC_089312.1_Pverrucosa.location_watterson_theta.txt" "./location//NC_089312.1_Pverrucosa.location_watterson_theta.txt" ...
+ $ pop                : Factor w/ 10 levels "ALOF","AOAA",..: 1 2 3 4 6 5 8 7 10 9 ...
+ $ chromosome         : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1       : num [1:352360] 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_2       : num [1:352360] 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 ...
+ $ avg_watterson_theta: num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+ $ no_sites           : num [1:352360] 0 0 0 0 0 0 0 0 0 0 ...
+ $ raw_watterson_theta: num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+ $ no_var_sites       : num [1:352360] 0 0 0 0 0 0 0 0 0 0 ...
+ $ weighted_no_sites  : num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+```
+
+<br>
+
+```r
+# plot distribution of callable sites per 10kb window
+ggplot(theta_location, aes(x = no_sites)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = 7000, linetype = "dashed") +  # cutoff I've been using for previous pixy runs
+  facet_wrap(~ pop) +
+  labs(
+    x = "Number of callable sites per window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 10000, by = 2000)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-52.png)
+
+<br>
+
+```r
+# filter dataset based on 7000 site cutoff
+theta_location_filt <- theta_location %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering
+theta_location %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+```
+
+```
+   total retained  prop
+1 352360   169610 0.481
+```
+
+<br>
+
+```r
+# plot distribution of theta across filtered 10kb windows with pooled theta for ALL samples indicated for reference
+ggplot(theta_location_filt, aes(x = avg_watterson_theta, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = pooled_theta_all, linetype = "dashed") +
+  facet_wrap(~ pop) +
+  labs(
+    x = "Watterson's θ",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+
+ggplot(theta_location_filt, aes(x = avg_watterson_theta, color = pop)) +
+  geom_density(alpha = 0.5, position = "identity") +
+  labs(
+    x = "Watterson's θ",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-53.png)
+![alt text](image-54.png)
+Theta distributions more divergent across locations compared to pi (e.g., OFU6 vs FTEL).
+
+<br>
+
+```r
+# calculate full summary stats for genome-wide theta by location
+theta_sum_location <- theta_location_filt %>% 
+  group_by(pop) %>% 
+  summarise(
+    pooled_theta = sum(raw_watterson_theta, na.rm = TRUE) / sum(weighted_no_sites, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_watterson_theta, no_sites),
+    median = median(avg_watterson_theta),
+    sd = sd(avg_watterson_theta),
+    q05 = quantile(avg_watterson_theta, 0.05),
+    q95 = quantile(avg_watterson_theta, 0.95)
+  )
+
+theta_sum_location %>% arrange(desc(pooled_theta))
+```
+
+```
+   pop   pooled_theta  w_mean  median      sd      q05     q95
+   <fct>        <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+ 1 OFU6       0.00262 0.00261 0.00244 0.00143 0.000433 0.00510
+ 2 FALU       0.00246 0.00245 0.00229 0.00134 0.000415 0.00474
+ 3 FASA       0.00242 0.00241 0.00226 0.00131 0.000395 0.00466
+ 4 MALO       0.00241 0.00240 0.00226 0.00130 0.000399 0.00464
+ 5 LEON       0.00241 0.00240 0.00224 0.00131 0.000404 0.00466
+ 6 ALOF       0.00241 0.00239 0.00224 0.00131 0.000410 0.00467
+ 7 AOAA       0.00239 0.00238 0.00221 0.00130 0.000395 0.00461
+ 8 OFU3       0.00233 0.00231 0.00217 0.00125 0.000394 0.00445
+ 9 VATI       0.00228 0.00227 0.00213 0.00124 0.000382 0.00440
+10 FTEL       0.00215 0.00214 0.00200 0.00117 0.000361 0.00414
+```
+Theta a bit more variable across locations than pi (0.00215-0.00262; OFU6 greatest, FTEL smallest)
+
+<br>
+
+```r
+# facet by chromosome and location (using pooled_theta_all as x-intercept for reference)
+ggplot(theta_location_filt, aes(x = avg_watterson_theta, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = pooled_theta_all, linetype = "dashed") +
+  facet_grid(pop ~ chromosome) +
+  labs(
+    x = "Watterson's θ",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-55.png)
+
+<br>
+
+```r
+# plot per-window theta across genome by location
+ggplot(theta_location_filt, aes(x = window_pos_1, y = avg_watterson_theta)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_grid(pop ~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "θw"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-56.png)
+
+
+```r
+# calculate theta and summary stats per chromosome
+theta_sum_by_chrom_location <- theta_location_filt %>%
+  group_by(pop, chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    pooled_theta = sum(raw_watterson_theta, na.rm = TRUE) / sum(weighted_no_sites, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_watterson_theta, no_sites),  # weighted mean theta
+    uw_mean = mean(avg_watterson_theta),                    # unweighted mean theta
+    median = median(avg_watterson_theta),
+    sd = sd(avg_watterson_theta),
+    q05 = quantile(avg_watterson_theta, 0.05),
+    q95 = quantile(avg_watterson_theta, 0.95),
+    .groups = "drop"
+  )
+
+
+# plot summary stats by chromosome and location
+ggplot(theta_sum_by_chrom_location, aes(x = chromosome, y = pooled_theta, color = pop)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = expression("pooled"~theta~"(window-based 5th-95th percentile range)")
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-57.png)
+OFU6 consistently high, FTEL consistently low.
+
+<br>
+<br>
+
+### Location-level Tajima's D
+
+```r
+# Now tajimad files (location run)
+
+# Load in files
+tajimad_location_files <- list.files(
+  "./location/",
+  pattern = "_tajima_d.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(tajimad_location_files) <- tajimad_location_files
+
+# import and combine location tajimad files while creating new column with file path/name
+tajimad_location_raw <- map_dfr(tajimad_location_files, read_tsv, .id = "source_file")
+
+# reformatting
+tajimad_location <- tajimad_location_raw %>% 
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop = as.factor(pop)
+  )
+
+str(tajimad_location)
+```
+
+```
+tibble [352,360 × 10] (S3: tbl_df/tbl/data.frame)
+ $ source_file        : chr [1:352360] "./location//NC_089312.1_Pverrucosa.location_tajima_d.txt" "./location//NC_089312.1_Pverrucosa.location_tajima_d.txt" "./location//NC_089312.1_Pverrucosa.location_tajima_d.txt" "./location//NC_089312.1_Pverrucosa.location_tajima_d.txt" ...
+ $ pop                : Factor w/ 10 levels "ALOF","AOAA",..: 1 2 3 4 6 5 8 7 10 9 ...
+ $ chromosome         : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1       : num [1:352360] 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_2       : num [1:352360] 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 ...
+ $ tajima_d           : num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+ $ no_sites           : num [1:352360] 0 0 0 0 0 0 0 0 0 0 ...
+ $ raw_pi             : num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+ $ raw_watterson_theta: num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+ $ tajima_d_stdev     : num [1:352360] NA NA NA NA NA NA NA NA NA NA ...
+```
+
+<br>
+
+```r
+# plot distribution of callable sites per 10kb window
+ggplot(tajimad_location, aes(x = no_sites)) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = 7000, linetype = "dashed") +  # cutoff I've been using for previous pixy runs
+  facet_wrap(~ pop) +
+  labs(
+    x = "Number of callable sites per window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 10000, by = 2000)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-58.png)
+
+<br>
+
+```r
+# filter dataset based on 7000 site cutoff
+tajimad_location_filt <- tajimad_location %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering
+tajimad_location %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+```
+
+```
+   total retained  prop
+1 352360   169610 0.481
+```
+
+<br>
+
+```r
+# plot distribution of tajimad across filtered 10kb windows with wmean tajimad for ALL samples indicated for reference
+ggplot(tajimad_location_filt, aes(x = tajima_d, fill = pop)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_tajimad_all, linetype = "dashed") +
+  facet_wrap(~ pop) +
+  labs(
+    x = "Tajima's D",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-59.png)
+
+
+```r
+ggplot(tajimad_location_filt, aes(x = tajima_d, color = pop)) +
+  geom_density(alpha = 0.5, position = "identity") +
+  labs(
+    x = "Tajima's D",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-60.png)
+
+
+```r
+ggplot(tajimad_location_filt %>% filter(pop == "FTEL" | pop == "OFU6"), aes(x = tajima_d, color = pop)) +
+  geom_density(alpha = 0.5, position = "identity") +
+  labs(
+    x = "Tajima's D",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-61.png)
+Tajima's D distributions more divergent across locations compared to pi (e.g., OFU6 vs FTEL).
+
+<br>
+
+```r
+# Double check callable sites by location
+tajimad_location_filt %>%
+  group_by(pop) %>%
+  summarise(mean_sites = mean(no_sites))
+```
+Mean number of callable sites is identical (8489) across islands.
+
+<br>
+
+Check number of windows with Tajima's D = NA and sample sizes for each location:
+```r
+# load sample sizes
+sampsizes_location <- read_tsv("../vcf/pixy_location.pop.tsv", col_names = FALSE) %>%
+  rename(sample = X1, pop = X2) %>%
+  count(pop, name = "n") %>%
+  arrange(desc(n))
+
+# determine how many NAs in dataset (windows where pi and theta were both 0 (invariant regions), so Tajima's D is undefined)
+NA_sum_location <- tajimad_location_filt %>% 
+  group_by(pop) %>% 
+  summarize(
+    numNA = sum(is.na(tajima_d)),
+    num_windows = n(),
+    propNA = numNA/num_windows
+    ) %>% 
+  arrange(desc(propNA)) %>% 
+  left_join(sampsizes_location, by = "pop")
+
+NA_sum_location
+```
+
+```
+   pop   numNA num_windows  propNA     n
+ 1 FASA    108       16961 0.00637     8
+ 2 MALO    102       16961 0.00601     9
+ 3 OFU6     95       16961 0.00560     7
+ 4 VATI     92       16961 0.00542    14
+ 5 AOAA     88       16961 0.00519    12
+ 6 FTEL     84       16961 0.00495    24
+ 7 LEON     83       16961 0.00489    14
+ 8 FALU     79       16961 0.00466    14
+ 9 ALOF     76       16961 0.00448    16
+10 OFU3     73       16961 0.00430    17
+```
+
+<br>
+
+```r
+# plot propNA vs. sample size
+ggplot(NA_sum_location) +
+  geom_point(aes(x = n, y = propNA)) +
+  scale_x_continuous(breaks = seq(from = 0, to = 26, by = 2)) +
+  theme_bw()
+```
+![alt text](image-62.png)
+There is the expected trend of more NA windows in lower sample size locations, but effect size is small (range of propNA is only 0.0043 - 0.00637), and there is also some real among-location variation beyond sample size alone (e.g, FTEL has greatest n but moderate NAprop).
+
+<br>
+
+```r
+tajimad_sum_location <- tajimad_location_filt %>% 
+  group_by(pop) %>% 
+  summarise(
+    w_mean = weighted.mean(tajima_d, no_sites, na.rm = TRUE), # have to rely on weighted means here because Tajima's D cannot be pooled across windows like pi and theta
+    median = median(tajima_d, na.rm = TRUE),
+    sd = sd(tajima_d, na.rm = TRUE),
+    q05 = quantile(tajima_d, 0.05, na.rm = TRUE),
+    q95 = quantile(tajima_d, 0.95, na.rm = TRUE)
+  )
+
+tajimad_sum_location %>% arrange(desc(w_mean))
+```
+
+```
+   pop   w_mean median    sd   q05   q95
+ 1 FTEL  -0.212 -0.200 0.793 -1.54 1.09 
+ 2 VATI  -0.409 -0.376 0.805 -1.77 0.879
+ 3 OFU3  -0.426 -0.407 0.755 -1.69 0.803
+ 4 AOAA  -0.467 -0.431 0.788 -1.82 0.755
+ 5 ALOF  -0.507 -0.489 0.745 -1.75 0.700
+ 6 LEON  -0.544 -0.525 0.753 -1.80 0.669
+ 7 FALU  -0.556 -0.552 0.742 -1.78 0.653
+ 8 MALO  -0.657 -0.608 0.797 -2.03 0.583
+ 9 FASA  -0.683 -0.625 0.839 -2.14 0.606
+10 OFU6  -0.831 -0.788 0.793 -2.18 0.401
+```
+Tajima's D more variable across locations than pi (-0.831 to -0.212; OFU6 most negative, FTEL least negative).
+
+<br>
+
+
+
+
+
 
