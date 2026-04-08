@@ -2953,8 +2953,8 @@ ggplot(location_summary, aes(x = pooled_theta, y = wmean_TajimasD)) +
     - This pattern is consistent with comparatively weaker recent expansion or a more stable demographic history at FTEL (e.g., more stable population size, no/fewer strong recent selective sweeps, no/more mild recent expansion), although Tajima’s D alone cannot distinguish among demographic and selective processes or detect present but opposing processes that may counteract each other's effects on Tajima's D.
   - Admixture plots also show FTEL separating out as a notable group by k=4, and in the PCA, PCs 2 and 3 separate out FTEL pretty well from the other points
   - So, likely:
-    - OFU6 -> rare-allele enriched (negative D) → dynamic / expanding
-    - FTEL: less rare-allele skew + fewer SNPs → stable / drift-dominated
+    - OFU6: rare-allele enriched (negative D) -> dynamic / expanding
+    - FTEL: less rare-allele skew + fewer SNPs -> stable / drift-dominated
   - This is interesting given FTEL is the only location within the National Marine Sanctuary
 
 <br>
@@ -2963,11 +2963,286 @@ ggplot(location_summary, aes(x = pooled_theta, y = wmean_TajimasD)) +
 
 ### Island-level differentiation (Dxy & Fst)
 
-Now let's look at the genetic differentiation stats, Dxy and Fst.
+Now let's look at the genetic differentiation stats, Dxy and Fst, starting with the island-level comparison
 
 <br>
 
+```r
+### Island comparison first
 
+# Load in files
+dxy_island_files <- list.files(
+  "./island/",
+  pattern = "_dxy.txt$",
+  full.names = TRUE
+)
 
+# name the vector for use in .id column in next step
+names(dxy_island_files) <- dxy_island_files
+
+# import and combine island dxy files while creating new column with file path/name
+dxy_island_raw <- map_dfr(dxy_island_files, read_tsv, .id = "source_file")
+
+#reformatting
+dxy_island <- dxy_island_raw %>%
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop1 = as.factor(pop1),
+    pop2 = as.factor(pop2)
+  )
+
+str(dxy_island)
+```
+
+```
+tibble [35,236 × 11] (S3: tbl_df/tbl/data.frame)
+ $ source_file      : chr [1:35236] "./island//NC_089312.1_Pverrucosa.island_dxy.txt" "./island//NC_089312.1_Pverrucosa.island_dxy.txt" "./island//NC_089312.1_Pverrucosa.island_dxy.txt" "./island//NC_089312.1_Pverrucosa.island_dxy.txt" ...
+ $ pop1             : Factor w/ 1 level "Tutuila": 1 1 1 1 1 1 1 1 1 1 ...
+ $ pop2             : Factor w/ 1 level "Ofu": 1 1 1 1 1 1 1 1 1 1 ...
+ $ chromosome       : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1     : num [1:35236] 1 10001 20001 30001 40001 ...
+ $ window_pos_2     : num [1:35236] 1e+04 2e+04 3e+04 4e+04 5e+04 6e+04 7e+04 8e+04 9e+04 1e+05 ...
+ $ avg_dxy          : num [1:35236] NA 0 0 0.00129 NA ...
+ $ no_sites         : num [1:35236] 0 189 864 2425 0 ...
+ $ count_diffs      : num [1:35236] NA 0 0 23842 NA ...
+ $ count_comparisons: num [1:35236] NA 1650064 7574788 18510048 NA ...
+ $ count_missing    : num [1:35236] NA 363920 1631996 7330752 NA ...
+```
+
+<br>
+
+```r
+# plot distribution of callable sites per 10kb window (should be same as other island stats)
+ggplot(dxy_island, aes(x = no_sites)) +
+  geom_histogram(bins = 50) +
+  labs(
+    x = "Number of callable sites per window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 10000, by = 2000)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-70.png)
+
+<br>
+
+```r
+# filter dataset based on 7000 site cutoff
+dxy_island_filt <- dxy_island %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering (another sanity check)
+dxy_island %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+
+# sensitivity check: try other cutoffs to see how it changes number of retained windows
+dxy_island %>%
+  summarise(
+    prop_6000 = mean(no_sites >= 6000),
+    prop_7000 = mean(no_sites >= 7000),
+    prop_8000 = mean(no_sites >= 8000)
+  )
+```
+
+```
+  total retained  prop
+  <int>    <int> <dbl>
+  35236    16961 0.481
+
+  prop_6000 prop_7000 prop_8000
+      <dbl>     <dbl>     <dbl>
+      0.542     0.481     0.367
+```
+Looks same as previous stats, as expected.
+
+<br>
+
+```r
+# plot distribution of dxy across filtered 10kb windows
+ggplot(dxy_island_filt, aes(x = avg_dxy)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  labs(
+    x = "avg_dxy (Mean per-site Dxy across 10 kb window)",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-71.png)
+Looks similar to distribution of pi.
+
+<br>
+
+```r
+# calculate full summary stats for genome-wide dxy between islands
+dxy_sum_island <- dxy_island_filt %>% 
+  summarise(
+    pooled_dxy = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_dxy, no_sites),
+    median = median(avg_dxy),
+    sd = sd(avg_dxy),
+    q05 = quantile(avg_dxy, 0.05),
+    q95 = quantile(avg_dxy, 0.95)
+  )
+
+wmean_dxy_island <- dxy_sum_island$w_mean[1]
+# genome-wide weighted mean dxy between islands: 0.0021435
+
+pooled_dxy_island <- dxy_sum_island$pooled_dxy[1]
+# genome-wide pooled dxy between islands: 0.0021494
+```
+
+```
+  pooled_dxy  w_mean  median      sd      q05     q95
+       <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+     0.00215 0.00214 0.00198 0.00121 0.000337 0.00425
+```
+Pooled dxy between islands is pretty close to pooled_pi_all.
+
+<br>
+
+```r
+# replot with weighted mean dxy for each island
+ggplot(dxy_island_filt, aes(x = avg_dxy)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_dxy_island, linetype = "dashed") +
+  labs(
+    x = "avg_dxy (Mean per-site Dxy across 10 kb window)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+
+```
+![alt text](image-72.png)
+
+<br>
+
+```r
+# facet by chromosome (using pooled_dxy_island as x-intercept for reference)
+ggplot(dxy_island_filt, aes(x = avg_dxy)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = pooled_dxy_island, linetype = "dashed") +
+  facet_grid(~ chromosome) +
+  labs(
+    x = "avg_dxy (Mean per-site Dxy across 10 kb window)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-73.png)
+
+<br>
+
+```r
+# plot per-window dxy across genome
+ggplot(dxy_island_filt, aes(x = window_pos_1, y = avg_dxy)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_grid(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "avg_dxy"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-74.png)
+
+<br>
+
+```r
+# calculate dxy and summary stats per chromosome
+dxy_sum_by_chrom_island <- dxy_island_filt %>%
+  group_by(chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_sites = sum(no_sites),
+    pooled_dxy = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_dxy, no_sites),  # weighted mean dxy
+    uw_mean = mean(avg_dxy),                    # unweighted mean dxy
+    median = median(avg_dxy),
+    sd = sd(avg_dxy),
+    q05 = quantile(avg_dxy, 0.05),
+    q95 = quantile(avg_dxy, 0.95),
+    .groups = "drop"
+  )
+```
+
+```
+   chromosome  n_windows total_sites pooled_dxy  w_mean uw_mean  median      sd      q05     q95
+   <fct>           <int>       <dbl>      <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+ 1 NC_089312.1      1929    16465783    0.00224 0.00224 0.00219 0.00211 0.00118 0.000384 0.00429
+ 2 NC_089313.1      1238    10583414    0.00201 0.00201 0.00196 0.00182 0.00114 0.000332 0.00408
+ 3 NC_089314.1      1674    14327238    0.00240 0.00239 0.00235 0.00225 0.00123 0.000505 0.00448
+ 4 NC_089315.1      1711    14649218    0.00220 0.00219 0.00215 0.00208 0.00119 0.000369 0.00420
+ 5 NC_089316.1       699     5718524    0.00221 0.00220 0.00213 0.00187 0.00137 0.000249 0.00464
+ 6 NC_089317.1       954     8016663    0.00219 0.00218 0.00213 0.00202 0.00124 0.000388 0.00432
+ 7 NC_089318.1      1177     9919168    0.00192 0.00191 0.00186 0.00173 0.00115 0.000223 0.00390
+ 8 NC_089319.1      1303    11201350    0.00221 0.00220 0.00216 0.00211 0.00122 0.000367 0.00437
+ 9 NC_089320.1      1369    11700279    0.00216 0.00215 0.00211 0.00197 0.00118 0.000337 0.00432
+10 NC_089321.1      1147     9734480    0.00223 0.00222 0.00217 0.00205 0.00120 0.000423 0.00433
+11 NC_089322.1       741     6116158    0.00187 0.00187 0.00181 0.00165 0.00121 0.000175 0.00414
+12 NC_089323.1       872     7254096    0.00199 0.00198 0.00192 0.00175 0.00125 0.000170 0.00408
+13 NC_089324.1       918     7752971    0.00202 0.00201 0.00195 0.00186 0.00116 0.000241 0.00405
+14 NC_089325.1      1229    10542673    0.00212 0.00212 0.00208 0.00196 0.00116 0.000387 0.00410
+```
+
+<br>
+
+```r
+ggplot(dxy_sum_by_chrom_island, aes(x = chromosome, y = pooled_dxy)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = "pooled dxy (window-based 5th-95th percentile range)"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-75.png)
+
+```r
+# plot dxy against pi by chromosome
+plot(pi_sum_by_chrom$pooled_pi, 
+     dxy_sum_by_chrom_island$pooled_dxy,
+     xlab = "π (within-pop diversity)",
+     ylab = "Dxy (between-pop divergence)",
+     pch = 19)
+abline(0, 1, lty = 2, col = "red")
+```
+![alt text](image-76.png)
+
+```r
+# ggplot version for nicer plot
+dxy_island_vs_pi <- pi_sum_by_chrom %>%
+  select(chromosome, pooled_pi) %>%
+  left_join(
+    dxy_sum_by_chrom_island %>%
+      select(chromosome, pooled_dxy),
+    by = "chromosome"
+  )
+
+ggplot(dxy_island_vs_pi, aes(x = pooled_pi, y = pooled_dxy)) +
+  geom_point(size = 3) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  geom_text_repel(aes(label = chromosome), size = 3) +
+  coord_equal() +
+  labs(
+    x = expression("Within-population diversity (" * pi * ")"),
+    y = expression("Between-population divergence (" * D[xy] * ")")
+  ) +
+  theme_bw()
+```
+![alt text](image-77.png)
+This just shows what we already know, there is some degree of population structure (differentiation) between Ofu and Tutuila. Sequences drawn from different island are more different than sequences drawn within islands.
+
+<br>
+<br>
 
 
