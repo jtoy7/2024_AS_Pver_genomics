@@ -716,7 +716,7 @@ Pi of 10kb windows across the genome:
 With LOESS smoothing curve:
 ![alt text](image-7.png)
 
-Pi looks pretty consistent across chromosomes (background genomic variation fairly homogenous; no obvious genome-wide structure). Pi generally ranges from 0 to 0.006 for all chromosomes, with majority of windows below 0.004 (as seen in the distribution plot). Some fine scale heterogeneity within chromosomes (regions of realtively high or low pi). Low-pi regions could represent conserved regions or evidence of selective sweeps. High-pi regions could indicate balancing selection, introgression, or regions with high recombination rates. Chromosomes 16.1 and 17.1 seem to have the most missing data.
+Pi looks pretty consistent across chromosomes (background genomic variation broadly consistent; no obvious genome-wide structure). Pi generally ranges from 0 to 0.006 for all chromosomes, with majority of windows below 0.004 (as seen in the distribution plot). Some fine scale heterogeneity within chromosomes (regions of realtively high or low pi). Low-pi regions could represent conserved regions or evidence of selective sweeps. High-pi regions could indicate balancing selection, introgression, or regions with high recombination rates. Chromosomes 16.1 and 17.1 seem to have the most missing data.
 
 ```r
 # calculate pi per chromosome
@@ -915,7 +915,7 @@ Watterson's theta by window across genome:
 With LOESS smoothing curve:
 ![alt text](image-14.png)
 
-Except for chromosomes with more missing windows, theta seems to be more homogeneous within chromosomes than pi. This makes sense to me because theta is a more coarse measure (essentially number of SNPs), and pi is more sensitive to difference in allele frequencies between those snps (SNPs with minor allele frequencies closer to 0.5 count more than low-frequency SNPs). Relatively homogenous theta means SNP density is fairly uniform across the genome, which indicates that there aren't massive differences in mutation rates.
+Except for chromosomes with more missing windows, theta seems to be more homogeneous within chromosomes than pi. This makes sense to me because theta is a more coarse measure (essentially number of SNPs), and pi is more sensitive to difference in allele frequencies between those snps (SNPs with minor allele frequencies closer to 0.5 count more than low-frequency SNPs). Relatively homogenous theta means SNP density is fairly uniform across the genome, which could indicate that there aren't massive differences in mutation rates (but other factors also affect theta).
 
 <br>
 
@@ -2946,7 +2946,28 @@ ggplot(location_summary, aes(x = pooled_theta, y = wmean_TajimasD)) +
     - background selection
     - mild population expansion/recovery after disturbance
     - or subtle structure effects
-  
+- θ and Tajima's D show greater among location variation than π
+  - OFU6 notably shows the strongest excess of low-frequency variants among sites, consistent with stronger recent nonequilibrium dynamics and/or linked selection, but demographic and selective explanations cannot be distinguished from Tajima’s D alone.
+  - FTEL notably has lowest theta and most positive Tajima's D (closest to 0).
+    - Tajima's D closest to 0 means FTEL shows the weakest deviation from the neutral equilibrium expectation (least skewed/perturbed SFS), relative to the other populations
+    - This pattern is consistent with comparatively weaker recent expansion or a more stable demographic history at FTEL (e.g., more stable population size, no/fewer strong recent selective sweeps, no/more mild recent expansion), although Tajima’s D alone cannot distinguish among demographic and selective processes or detect present but opposing processes that may counteract each other's effects on Tajima's D.
+  - Admixture plots also show FTEL separating out as a notable group by k=4, and in the PCA, PCs 2 and 3 separate out FTEL pretty well from the other points
+  - So, likely:
+    - OFU6 -> rare-allele enriched (negative D) → dynamic / expanding
+    - FTEL: less rare-allele skew + fewer SNPs → stable / drift-dominated
+  - This is interesting given FTEL is the only location within the National Marine Sanctuary
+
+<br>
+
+<br>
+
+### Island-level differentiation (Dxy & Fst)
+
+Now let's look at the genetic differentiation stats, Dxy and Fst.
+
+<br>
+
+
 
 
 
