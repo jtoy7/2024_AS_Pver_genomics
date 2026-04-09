@@ -2967,6 +2967,8 @@ Now let's look at the genetic differentiation stats, Dxy and Fst, starting with 
 
 <br>
 
+#### Start with Dxy
+
 ```r
 ### Island comparison first
 
@@ -3245,4 +3247,286 @@ This just shows what we already know, there is some degree of population structu
 <br>
 <br>
 
+#### Now Fst
+```r
+## Now Fst
+
+# Load in files
+fst_island_files <- list.files(
+  "./island/",
+  pattern = "_fst.txt$",
+  full.names = TRUE
+)
+
+  # only 18 Fst files instead of 27 because some scaffolds had no SNPs at all, which makes the demoninator 0 and Fst undefined.
+
+# name the vector for use in .id column in next step
+names(fst_island_files) <- fst_island_files
+
+# import and combine island fst files while creating new column with file path/name
+fst_island_raw <- map_dfr(fst_island_files, read_tsv, .id = "source_file")
+
+#reformatting
+fst_island <- fst_island_raw %>%
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop1 = as.factor(pop1),
+    pop2 = as.factor(pop2)
+  )
+
+str(fst_island)
+```
+
+```
+tibble [25,248 × 8] (S3: tbl_df/tbl/data.frame)
+ $ source_file   : chr [1:25248] "./island//NC_089312.1_Pverrucosa.island_fst.txt" "./island//NC_089312.1_Pverrucosa.island_fst.txt" "./island//NC_089312.1_Pverrucosa.island_fst.txt" "./island//NC_089312.1_Pverrucosa.island_fst.txt" ...
+ $ pop1          : Factor w/ 1 level "Tutuila": 1 1 1 1 1 1 1 1 1 1 ...
+ $ pop2          : Factor w/ 1 level "Ofu": 1 1 1 1 1 1 1 1 1 1 ...
+ $ chromosome    : Factor w/ 18 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1  : num [1:25248] 30001 60001 70001 80001 120001 ...
+ $ window_pos_2  : num [1:25248] 40000 70000 80000 90000 130000 140000 190000 200000 210000 220000 ...
+ $ avg_hudson_fst: num [1:25248] 0.03841 0.02053 0.04777 0.02513 0.00599 ...
+ $ no_snps       : num [1:25248] 15 16 21 59 7 6 78 152 116 89 ...
+```
+
+<br>
+
+```r
+# plot distribution of SNPs per 10kb window (no_sites is not included in pixy output)
+ggplot(fst_island, aes(x = no_snps)) +
+  geom_histogram(binwidth = 10) +
+  labs(
+    x = "Number of SNPs per 10 kb window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 800, by = 100)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# log-scaled x-axis version for better visual clarity at low SNP numbers
+ggplot(fst_island, aes(x = no_snps)) +
+  geom_histogram() +
+  labs(
+    x = "Number of SNPs per 10 kb window (log scale)",
+    y = "Number of windows"
+  ) +
+  scale_x_log10() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-78.png)
+![alt text](image-79.png)
+
+```r
+# summarize remaining windows if we filter for windows with at least 10 SNPs
+fst_island %>%
+  summarise(
+    total = n(),
+    retained = sum(no_snps >= 10),
+    prop = retained / total
+  )
+
+# sensitivity check: try other cutoffs to see how it changes number of retained windows
+fst_island %>%
+  summarise(
+    prop_05 = mean(no_snps >= 5),
+    prop_10 = mean(no_snps >= 10),
+    prop_20 = mean(no_snps >= 20),
+    prop_30 = mean(no_snps >= 30)
+  )
+```
+```
+  total retained  prop
+  <int>    <int> <dbl>
+  25248    21524 0.853
+
+  prop_05 prop_10 prop_20 prop_30
+    <dbl>   <dbl>   <dbl>   <dbl>
+    0.905   0.853   0.776   0.711
+```
+This means we could use a cutoff value of >= 10 SNPs, but this leaves 21,524 windows which is more than the 16,961 windows kept for dxy (after filtering for no_sites >= 7000), so Fst and Dxy would not be directly comparable.
+
+Instead, let's use the same windows we kept for the Dxy analysis:
+```r
+keep_windows <- dxy_island %>%
+  filter(no_sites >= 7000) %>%
+  select(chromosome, window_pos_1, window_pos_2)
+
+fst_island_filt <- fst_island %>%
+  inner_join(keep_windows, by = c("chromosome", "window_pos_1", "window_pos_2"))
+
+# summarize remaining windows after keeping sites used in dxy analysis
+nrow(fst_island)
+nrow(fst_island_filt)
+nrow(fst_island_filt)/nrow(fst_island)
+
+nrow(dxy_island_filt) - nrow(fst_island_filt)
+```
+```
+> nrow(fst_island)
+[1] 25248
+> nrow(fst_island_filt)
+[1] 16911
+> nrow(fst_island_filt)/nrow(fst_island)
+[1] 0.669795627376426
+> nrow(dxy_island_filt) - nrow(fst_island_filt)
+[1] 50
+```
+So only 50 windows are missing that did not have enough polymorphism to calculate Fst but were included in the dxy analysis.
+
+<br>
+
+```r
+# now filter based on low snp number (low snp number creates unreliable Fst estimates)
+fst_island_filt_snpfilt <- fst_island_filt %>% filter(no_snps >= 10)
+
+nrow(fst_island_filt_snpfilt)
+nrow(fst_island_filt) - nrow(fst_island_filt_snpfilt)
+```
+```
+> nrow(fst_island_filt_snpfilt)
+[1] 16566
+> nrow(fst_island_filt) - nrow(fst_island_filt_snpfilt)
+[1] 345
+```
+Good news: this only removes another 345 windows.
+
+<br>
+
+```r
+# plot distribution of average fst across filtered 10kb windows
+ggplot(fst_island_filt_snpfilt, aes(x = avg_hudson_fst)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  labs(
+    x = "avg_hudson_fst (Mean per-site Hudson's Fst across SNPs in 10 kb window)",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-80.png)
+Right tailed distribution with mode around 0.02. Note left tail has a few values below 0. This is caused by sampling noise around zero and common when divergence is low and SNP counts are modest.
+
+<br>
+
+```r
+# calculate full summary stats for genome-wide Fst between islands
+fst_sum_island <- fst_island_filt_snpfilt %>% 
+  summarise(
+    w_mean = weighted.mean(avg_hudson_fst, no_snps),  # pixy output doesn't give separate numerator and denominator values, so pooling isn't possible. Next best option is mean weighted by no_snps in window.
+    median = median(avg_hudson_fst),
+    sd = sd(avg_hudson_fst),
+    q05 = quantile(avg_hudson_fst, 0.05),
+    q95 = quantile(avg_hudson_fst, 0.95)
+  )
+
+wmean_fst_island <- fst_sum_island$w_mean[1]
+```
+```
+  w_mean median     sd      q05    q95
+   <dbl>  <dbl>  <dbl>    <dbl>  <dbl>
+  0.0265 0.0208 0.0266 -0.00207 0.0777
+```
+Genome-wide weighted mean Fst between islands: 0.0264826
+
+<br>
+
+```r
+# replot with weighted mean fst
+ggplot(fst_island_filt_snpfilt, aes(x = avg_hudson_fst)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_fst_island, linetype = "dashed") +
+  labs(
+    x = "avg_hudson_fst (Mean per-site Hudson's Fst across SNPs in 10 kb window)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-81.png)
+
+<br>
+
+```r
+# facet by chromosome (using mean_fst_island as x-intercept for reference)
+ggplot(fst_island_filt_snpfilt, aes(x = avg_hudson_fst)) +
+  geom_histogram(binwidth = .005, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = wmean_fst_island, linetype = "dashed") +
+  facet_grid(~ chromosome) +
+  labs(
+    x = "avg_hudson_fst (Mean per-site Hudson's Fst across SNPs in 10 kb window)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-82.png)
+
+<br>
+
+```r
+# calculate fst and summary stats per chromosome
+fst_sum_by_chrom_island <- fst_island_filt_snpfilt %>%
+  group_by(chromosome) %>% 
+  summarise(
+    n_windows = n(),
+    total_snps = sum(no_snps),
+    w_mean = weighted.mean(avg_hudson_fst, no_snps),  # weighted mean fst (weighted by no_snps)
+    uw_mean = mean(avg_hudson_fst),                    # unweighted mean fst
+    median = median(avg_hudson_fst),
+    sd = sd(avg_hudson_fst),
+    q05 = quantile(avg_hudson_fst, 0.05),
+    q95 = quantile(avg_hudson_fst, 0.95),
+    .groups = "drop"
+  )
+```
+```
+   chromosome  n_windows total_snps w_mean uw_mean median     sd       q05    q95
+   <fct>           <int>      <dbl>  <dbl>   <dbl>  <dbl>  <dbl>     <dbl>  <dbl>
+ 1 NC_089312.1      1899     225893 0.0244  0.0248 0.0193 0.0229 -0.00160  0.0700
+ 2 NC_089313.1      1216     118392 0.0331  0.0330 0.0270 0.0283  0.000406 0.0877
+ 3 NC_089314.1      1657     196851 0.0291  0.0290 0.0237 0.0264 -0.00181  0.0759
+ 4 NC_089315.1      1679     179775 0.0229  0.0239 0.0166 0.0253 -0.00287  0.0762
+ 5 NC_089316.1       680      92357 0.0226  0.0222 0.0183 0.0184  0.000349 0.0592
+ 6 NC_089317.1       936     112109 0.0221  0.0234 0.0171 0.0237 -0.00208  0.0673
+ 7 NC_089318.1      1122     101610 0.0258  0.0261 0.0202 0.0258 -0.00228  0.0740
+ 8 NC_089319.1      1278     143293 0.0255  0.0254 0.0169 0.0313 -0.00419  0.0826
+ 9 NC_089320.1      1341     142068 0.0325  0.0337 0.0253 0.0332 -0.00215  0.100 
+10 NC_089321.1      1126     124642 0.0259  0.0264 0.0206 0.0261 -0.00231  0.0733
+11 NC_089322.1       701      72972 0.0327  0.0331 0.0279 0.0256  0.000684 0.0788
+12 NC_089323.1       831      89096 0.0280  0.0293 0.0223 0.0280  0.000638 0.0864
+13 NC_089324.1       896      90551 0.0256  0.0261 0.0208 0.0239 -0.00215  0.0756
+14 NC_089325.1      1204     125872 0.0234  0.0245 0.0190 0.0247 -0.00333  0.0704
+```
+
+```r
+# plot per-window fst across genome
+ggplot(fst_island_filt_snpfilt, aes(x = window_pos_1, y = avg_hudson_fst)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_grid(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "avg_hudson_fst"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-83.png)
+
+<br>
+
+```r
+# plot summary stats by chromosome
+ggplot(fst_sum_by_chrom_island, aes(x = chromosome, y = w_mean)) +
+  geom_point(size = 3, position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = q05, ymax = q95), width = 0.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Chromosome",
+    y = "weighted mean Fst (window-based 5th-95th percentile range)"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-84.png)
+
+<br>
 
