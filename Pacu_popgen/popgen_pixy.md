@@ -3510,7 +3510,7 @@ ggplot(fst_island_filt_snpfilt, aes(x = window_pos_1, y = avg_hudson_fst)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
-![alt text](image-83.png)
+![alt text](image-85.png)
 
 <br>
 
