@@ -3426,7 +3426,9 @@ wmean_fst_island <- fst_sum_island$w_mean[1]
    <dbl>  <dbl>  <dbl>    <dbl>  <dbl>
   0.0265 0.0208 0.0266 -0.00207 0.0777
 ```
-Genome-wide weighted mean Fst between islands: 0.0264826
+Genome-wide weighted mean **Fst between islands: 0.0264826**.
+
+About 2.65% of the total genetic variation is attributable to differences between islands, while ~97.35% exists within islands. So islands are significantly but very weakly differentiated.
 
 <br>
 
@@ -3530,3 +3532,19 @@ ggplot(fst_sum_by_chrom_island, aes(x = chromosome, y = w_mean)) +
 
 <br>
 
+
+
+
+No strong correllation between Fst and Dxy, so Fst is only partially explained by Dxy.
+
+Hudson's Fst:
+Fst​ = 1 − (avg. ​within-pop π)​/Dxy​
+
+If Fst were driven purely by divergence, we’d see a tight positive relationship, but we don't see that here. This means variation in Fst is strongly influenced by within-population diversity (π), not just divergence (Dxy).
+
+We see:
+- many windows with low Fst even at moderate Dxy
+- high fst mostly at low to moderate Dxy values, indicating Fst inflation is driven by reduced π, not elevated Dxy
+- no cluster of high Fst + high Dxy, so no "islands of divergence" 
+
+**Interpretation**: Genome-wide patterns of relative differentiation are weak (Fst = 0.0265) and show little association with either absolute divergence (Dxy) or average within-population diversity (π) independently. Instead, Dxy and π are nearly identical across genomic windows, with Dxy slightly elevated, indicating that most genetic variation is shared among populations. Variation in FST is strongly associated with the difference between Dxy and π, suggesting relative differentiation reflects small but genome-wide elevations in between-population divergence. These patterns are consistent with weak, genome-wide differentiation maintained by ongoing gene flow and/or recent divergence in a large effective population.
