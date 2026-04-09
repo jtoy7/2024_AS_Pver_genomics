@@ -3532,19 +3532,124 @@ ggplot(fst_sum_by_chrom_island, aes(x = chromosome, y = w_mean)) +
 
 <br>
 
+```r
+# plot Fst against Dxy by chromosome
+plot(dxy_sum_by_chrom_island$pooled_dxy, 
+     fst_sum_by_chrom_island$w_mean,
+     xlab = "Dxy (between-pop divergence)",
+     ylab = "Fst (Hudson's)",
+     pch = 19)
+
+# ggplot version for nicer plot
+fst_island_vs_dxy <- dxy_sum_by_chrom_island %>%
+  select(chromosome, pooled_dxy) %>%
+  left_join(
+    fst_sum_by_chrom_island %>%
+      select(chromosome, w_mean),
+    by = "chromosome"
+  )
+
+ggplot(fst_island_vs_dxy, aes(x = pooled_dxy, y = w_mean)) +
+  geom_point(size = 3) +
+  geom_text_repel(aes(label = chromosome), size = 3) +
+  labs(
+    x = expression("Between-population divergence (" * D[xy] * ")"),
+    y = expression("Hudson's " *F[ST])
+    ) +
+  theme_bw()
+```
+![alt text](image-86.png)
+
+<br>
+
+```r
+# plot Fst againsd Dxy and pi by window
+island_fst_dxy_pi_windows <- fst_island_filt_snpfilt %>% 
+  select(chromosome, window_pos_1, window_pos_2, avg_hudson_fst, no_snps) %>%
+  left_join(
+    dxy_island_filt %>% 
+      select(chromosome, window_pos_1, window_pos_2, avg_dxy, no_sites),
+    by = c("chromosome", "window_pos_1", "window_pos_2")
+  ) %>% 
+  left_join(
+    pi_island_filt %>% 
+      select(chromosome, window_pos_1, window_pos_2, pop, avg_pi) %>% 
+      pivot_wider(
+        names_from = pop,
+        values_from = avg_pi,
+        names_prefix = "pi_"
+      ),
+    by = c("chromosome", "window_pos_1", "window_pos_2")
+  ) %>%
+  mutate(
+    avg_pi_within = (pi_Ofu + pi_Tutuila) / 2,
+    diff = avg_dxy - avg_pi_within
+  )
+
+# Fst vs Dxy
+fst_v_dxy <- ggplot(island_fst_dxy_pi_windows, aes(x = avg_dxy, y = avg_hudson_fst)) +
+  geom_point(alpha = 0.25, size = 2) +
+  geom_smooth(method = "lm") +
+  labs(
+    x = expression("Between-population divergence (" * D[xy] * ") of 10 kb window"),
+    y = expression("Hudson's " *F[ST] * " of 10kb window")
+  ) +
+  theme_bw()
+
+# Fst vs average pi
+fst_v_pi <- ggplot(island_fst_dxy_pi_windows, aes(x = avg_pi_within, y = avg_hudson_fst)) +
+  geom_point(alpha = 0.25, size = 2) +
+  geom_smooth(method = "lm") +
+  labs(
+    x = expression("Avg within-population diversity ("~pi~") of 10 kb window"),
+    y = expression("Hudson's " *F[ST] * " of 10kb window")
+  ) +
+  theme_bw()
+
+# Dxy vs average pi
+dxy_v_pi <- ggplot(island_fst_dxy_pi_windows, aes(x = avg_pi_within, y = avg_dxy)) +
+  geom_point(alpha = 0.25, size = 2) +
+  geom_smooth(method = "lm") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(
+    x = expression("Avg within-population diversity ("~pi~") of 10 kb window"),
+    y = expression("Between-population divergence (" * D[xy] * ") of 10 kb window")
+  ) +
+  theme_bw()
+
+  # Fst vs (Dxy-pi)
+fst_v_diff <- ggplot(island_fst_dxy_pi_windows, aes(x = diff, y = avg_hudson_fst)) +
+  geom_point(alpha = 0.25, size = 2) +
+  geom_smooth(method = "lm") +
+  labs(
+    x = expression(D[xy]~" - "~pi),
+    y = expression("Hudson's " *F[ST] * " of 10kb window")
+  ) +
+  theme_bw()
+
+library(cowplot)
+plot_grid(fst_v_dxy + fst_v_pi + dxy_v_pi + fst_v_diff)
+```
+![alt text](image-87.png)
 
 
-
-No strong correllation between Fst and Dxy, so Fst is only partially explained by Dxy.
+No strong correllation between Fst and Dxy, so Fst is only partially explained by Dxy.  
+No strong correllation between Fst and average population pi, so Fst is only partially explained by pi.
+Very tight (nearly 1:1) correllation between Dxy and average pi, but Dxy systemically greater than pi.
+Strong correlation between Fst and difference between Dxy and average pi.
 
 Hudson's Fst:
 Fst​ = 1 − (avg. ​within-pop π)​/Dxy​
 
-If Fst were driven purely by divergence, we’d see a tight positive relationship, but we don't see that here. This means variation in Fst is strongly influenced by within-population diversity (π), not just divergence (Dxy).
+If Fst were driven purely by divergence, we’d see a tight positive relationship, but we don't see that here.
 
 We see:
 - many windows with low Fst even at moderate Dxy
-- high fst mostly at low to moderate Dxy values, indicating Fst inflation is driven by reduced π, not elevated Dxy
+- high fst mostly at low to moderate Dxy values
+- similar pattern for pi
+- Fst has slightly positive realtionship with Dxy, slightly negative relationship with pi, but both very weak
 - no cluster of high Fst + high Dxy, so no "islands of divergence" 
 
-**Interpretation**: Genome-wide patterns of relative differentiation are weak (Fst = 0.0265) and show little association with either absolute divergence (Dxy) or average within-population diversity (π) independently. Instead, Dxy and π are nearly identical across genomic windows, with Dxy slightly elevated, indicating that most genetic variation is shared among populations. Variation in FST is strongly associated with the difference between Dxy and π, suggesting relative differentiation reflects small but genome-wide elevations in between-population divergence. These patterns are consistent with weak, genome-wide differentiation maintained by ongoing gene flow and/or recent divergence in a large effective population.
+**Interpretation**: Genome-wide patterns of relative differentiation are weak (Fst = 0.0265) and show little association with either absolute divergence (Dxy) or average within-population diversity (π) when considered independently. Instead, Dxy and π are nearly identical across genomic windows, with Dxy slightly but consistently elevated, indicating that most genetic variation is shared among populations. Variation in FST is strongly associated with the difference between Dxy and π, suggesting relative differentiation reflects small but genome-wide elevation in between-population divergence relative to within-population diversity. These patterns are consistent with weak, genome-wide differentiation maintained by ongoing gene flow and/or recent divergence in a large effective population.
+
+
