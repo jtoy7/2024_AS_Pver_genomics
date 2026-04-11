@@ -3738,3 +3738,112 @@ plot_grid(pi_track,
 
 ### Location-level differentiation (Dxy & Fst)
 
+#### Dxy first
+```r
+### Now location-level comparison
+## Dxy first
+
+# Load in files
+dxy_location_files <- list.files(
+  "./location/",
+  pattern = "_dxy.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(dxy_location_files) <- dxy_location_files
+
+# import and combine location dxy files while creating new column with file path/name
+dxy_location_raw <- map_dfr(dxy_location_files, read_tsv, .id = "source_file")
+
+#reformatting
+dxy_location <- dxy_location_raw %>%
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop1 = as.factor(pop1),
+    pop2 = as.factor(pop2)
+  )
+
+str(dxy_location)
+```
+```
+tibble [1,585,620 × 11] (S3: tbl_df/tbl/data.frame)
+ $ source_file      : chr [1:1585620] "./location//NC_089312.1_Pverrucosa.location_dxy.txt" "./location//NC_089312.1_Pverrucosa.location_dxy.txt" "./location//NC_089312.1_Pverrucosa.location_dxy.txt" "./location//NC_089312.1_Pverrucosa.location_dxy.txt" ...
+ $ pop1             : Factor w/ 9 levels "ALOF","AOAA",..: 1 1 1 1 9 4 4 4 5 5 ...
+ $ pop2             : Factor w/ 9 levels "AOAA","FALU",..: 1 2 3 4 9 7 8 9 5 6 ...
+ $ chromosome       : Factor w/ 27 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1     : num [1:1585620] 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_2     : num [1:1585620] 10000 10000 10000 10000 10000 10000 10000 10000 10000 10000 ...
+ $ avg_dxy          : num [1:1585620] NA NA NA NA NA NA NA NA NA NA ...
+ $ no_sites         : num [1:1585620] 0 0 0 0 0 0 0 0 0 0 ...
+ $ count_diffs      : num [1:1585620] NA NA NA NA NA NA NA NA NA NA ...
+ $ count_comparisons: num [1:1585620] NA NA NA NA NA NA NA NA NA NA ...
+ $ count_missing    : num [1:1585620] NA NA NA NA NA NA NA NA NA NA ...
+```
+
+<br>
+
+```r
+# plot distribution of callable sites per 10kb window (should be same as other location stats)
+ggplot(dxy_location, aes(x = no_sites)) +
+  geom_histogram(bins = 50) +
+  labs(
+    x = "Number of callable sites per window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 10000, by = 2000)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-89.png)
+
+<br>
+
+```r
+# filter dataset based on 7000 site cutoff
+dxy_location_filt <- dxy_location %>% 
+  filter(no_sites >= 7000)
+
+# summarize remaining windows after filtering (another sanity check)
+dxy_location %>%
+  summarise(
+    total = n(),
+    retained = sum(no_sites >= 7000),
+    prop = retained / total
+  )
+
+# sensitivity check: try other cutoffs to see how it changes number of retained windows
+dxy_location %>%
+  summarise(
+    prop_6000 = mean(no_sites >= 6000),
+    prop_7000 = mean(no_sites >= 7000),
+    prop_8000 = mean(no_sites >= 8000)
+  )
+```
+```
+    total retained  prop
+    <int>    <int> <dbl>
+  1585620   763245 0.481
+
+  prop_6000 prop_7000 prop_8000
+      <dbl>     <dbl>     <dbl>
+      0.542     0.481     0.367
+```
+
+<br>
+
+```r
+# plot distribution of average dxy across filtered 10kb windows
+ggplot(dxy_location_filt, aes(x = avg_dxy)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  labs(
+    x = "avg_dxy (Mean per-site Dxy across 10 kb window)",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-90.png)
+Looks similar to distribution for island-level comparison.
+
+<br>
+
