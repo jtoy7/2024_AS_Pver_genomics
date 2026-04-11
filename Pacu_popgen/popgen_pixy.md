@@ -3653,3 +3653,88 @@ We see:
 **Interpretation**: Genome-wide patterns of relative differentiation are weak (Fst = 0.0265) and show little association with either absolute divergence (Dxy) or average within-population diversity (π) when considered independently. Instead, Dxy and π are nearly identical across genomic windows, with Dxy slightly but consistently elevated, indicating that most genetic variation is shared among populations. Variation in FST is strongly associated with the difference between Dxy and π, suggesting relative differentiation reflects small but genome-wide elevation in between-population divergence relative to within-population diversity. These patterns are consistent with weak, genome-wide differentiation maintained by ongoing gene flow and/or recent divergence in a large effective population.
 
 
+<br>
+
+```r
+## Plot genome tracks for each metric as stacked plot
+
+# set theme settings
+track_theme <- theme_bw() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    strip.background = element_rect(fill = "grey90", color = "grey50"),
+    strip.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.margin = margin(3, 5.5, 3, 5.5)
+  )
+    
+
+# average pi
+pi_track <- ggplot(island_fst_dxy_pi_windows, aes(x = window_pos_1, y = avg_pi_within)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5, se = FALSE) +
+  facet_grid(~ chromosome, scales = "free_x") +
+  labs(
+    x = NULL,
+    y = expression("Avgerage population " * pi)
+  ) +
+  track_theme +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+# Dxy
+dxy_track <- ggplot(island_fst_dxy_pi_windows, aes(x = window_pos_1, y = avg_dxy)) +
+  geom_hline(yintercept = pooled_dxy_island, linetype = "dashed", linewidth = 0.4) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5, se = FALSE) +
+  facet_grid(~ chromosome, scales = "free_x") +
+  labs(
+    x = NULL,
+    y = expression(D[xy])
+  ) +
+  track_theme +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    strip.text = element_blank(),
+    strip.background = element_blank()
+  )
+
+# Fst
+fst_track <- ggplot(island_fst_dxy_pi_windows, aes(x = window_pos_1, y = avg_hudson_fst)) +
+  geom_hline(yintercept = wmean_fst_island, linetype = "dashed", linewidth = 0.4) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5, se = FALSE) +
+  facet_grid(~ chromosome, scales = "free_x") +
+  labs(
+    x = NULL,
+    y = expression("Hudson's " * F[ST])
+  ) +
+  track_theme +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    strip.text = element_blank(),
+    strip.background = element_blank()
+  )
+
+plot_grid(pi_track,
+          dxy_track,
+          fst_track,
+          ncol = 1,
+          align = "v",
+          axis = "lr",
+          rel_heights = c(1, 1, 1)
+)
+```
+
+![alt text](image-88.png)
+
+<br>
+<br>
+
+### Location-level differentiation (Dxy & Fst)
+
