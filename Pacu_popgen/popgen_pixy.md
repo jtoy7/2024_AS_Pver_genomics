@@ -3847,3 +3847,366 @@ Looks similar to distribution for island-level comparison.
 
 <br>
 
+```r
+# calculate full summary stats for genome-wide dxy between locations
+dxy_sum_location <- dxy_location_filt %>% 
+  group_by(comparison) %>% 
+  summarise(
+    pooled_dxy = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pixy-recommended approach for aggregating across windows
+    w_mean = weighted.mean(avg_dxy, no_sites),
+    median = median(avg_dxy),
+    sd = sd(avg_dxy),
+    q05 = quantile(avg_dxy, 0.05),
+    q95 = quantile(avg_dxy, 0.95)
+  ) %>% 
+  arrange(desc(pooled_dxy))
+```
+```
+   comparison pooled_dxy  w_mean  median      sd      q05     q95
+   <fct>           <dbl>   <dbl>   <dbl>   <dbl>    <dbl>   <dbl>
+ 1 AOAA_OFU3     0.00217 0.00217 0.00199 0.00123 0.000333 0.00433
+ 2 OFU3_VATI     0.00217 0.00216 0.00198 0.00123 0.000330 0.00433
+ 3 FASA_OFU3     0.00216 0.00215 0.00198 0.00123 0.000323 0.00431
+ 4 MALO_OFU3     0.00216 0.00215 0.00198 0.00123 0.000332 0.00430
+ 5 AOAA_OFU6     0.00216 0.00215 0.00197 0.00124 0.000326 0.00432
+ 6 ALOF_OFU3     0.00216 0.00215 0.00198 0.00122 0.000329 0.00430
+ 7 FALU_OFU3     0.00216 0.00215 0.00198 0.00122 0.000339 0.00429
+ 8 LEON_OFU3     0.00215 0.00214 0.00198 0.00121 0.000330 0.00428
+ 9 FTEL_OFU3     0.00214 0.00214 0.00197 0.00122 0.000333 0.00429
+10 OFU6_VATI     0.00214 0.00214 0.00197 0.00122 0.000320 0.00429
+...
+# ℹ 35 more rows
+```
+
+<br>
+
+```r
+# convert to matrix for easier visualization
+pop_order <- c("ALOF","AOAA","FALU","FASA","FTEL","LEON","MALO","OFU3","OFU6","VATI")
+
+dxy_matrix <- dxy_sum_location %>%
+  separate(comparison, into = c("pop1", "pop2"), sep = "_") %>%  # split comparison back into pop1 and pop2
+  select(pop1, pop2, pooled_dxy) %>%
+  mutate(pop1 = factor(pop1, levels = pop_order)) %>%
+  pivot_wider(names_from = pop2, values_from = pooled_dxy) %>%  # cast to matrix format
+  arrange(pop1) %>% 
+  select(pop1, all_of(pop_order[-1])) %>%   # reorder columns to match row order
+  column_to_rownames("pop1") %>%
+  as.matrix() %>% 
+  t() %>% 
+  round(5)
+
+dxy_matrix
+```
+```
+        ALOF    AOAA    FALU    FASA    FTEL    LEON    MALO    OFU3    OFU6
+AOAA 0.00212      NA      NA      NA      NA      NA      NA      NA      NA
+FALU 0.00210 0.00213      NA      NA      NA      NA      NA      NA      NA
+FASA 0.00210 0.00211 0.00210      NA      NA      NA      NA      NA      NA
+FTEL 0.00209 0.00210 0.00209 0.00209      NA      NA      NA      NA      NA
+LEON 0.00209 0.00211 0.00209 0.00209 0.00208      NA      NA      NA      NA
+MALO 0.00209 0.00210 0.00210 0.00207 0.00206 0.00208      NA      NA      NA
+OFU3 0.00216 0.00217 0.00216 0.00216 0.00214 0.00215 0.00216      NA      NA
+OFU6 0.00213 0.00216 0.00213 0.00213 0.00212 0.00212 0.00213 0.00213      NA
+VATI 0.00211 0.00212 0.00211 0.00207 0.00209 0.00210 0.00209 0.00217 0.00214
+```
+
+<br>
+
+```r
+# fill out full symmetrical matrix to enable reorder of locations
+pop_order <- c("ALOF","AOAA","FALU","FASA","FTEL","LEON","MALO","VATI","OFU3","OFU6")
+
+# original pairwise dataframe
+dxy_pairs <- dxy_sum_location %>%
+  separate(comparison, into = c("pop1", "pop2"), sep = "_") %>%
+  select(pop1, pop2, pooled_dxy)
+
+# reversed copy to bind
+dxy_pairs_rev <- dxy_pairs %>%
+  rename(new_pop1 = pop2, new_pop2 = pop1) %>% 
+  rename(pop1 = new_pop1, pop2 = new_pop2)
+
+# bind together and convert to full matrix
+dxy_matrix_full <- bind_rows(dxy_pairs, dxy_pairs_rev) %>% 
+  mutate(
+    pop1 = factor(pop1, levels = pop_order),
+    pop2 = factor(pop2, levels = pop_order)
+  ) %>%
+  pivot_wider(
+    names_from = pop2,
+    values_from = pooled_dxy,
+    names_expand = TRUE
+  ) %>%
+  arrange(pop1) %>%
+  select(pop1, all_of(pop_order)) %>%
+  column_to_rownames("pop1") %>%
+  as.matrix() %>%
+  round(5)
+
+
+# now reorder locations by island
+new_order <- c("ALOF","AOAA","FALU","FASA","FTEL","LEON","MALO","VATI","OFU3","OFU6")
+
+dxy_matrix_full_reordered <- dxy_matrix_full[new_order, new_order]
+
+
+# trim to lower triangle only
+dxy_matrix_lower <- dxy_matrix_full_reordered
+dxy_matrix_lower[upper.tri(dxy_matrix_lower, diag = TRUE)] <- NA
+dxy_matrix_lower
+
+# also create upper triangle in case I want it later
+dxy_matrix_upper <- dxy_matrix_full_reordered
+dxy_matrix_upper[lower.tri(dxy_matrix_upper, diag = TRUE)] <- NA
+```
+```
+        ALOF    AOAA    FALU    FASA    FTEL    LEON    MALO    VATI    OFU3 OFU6
+ALOF      NA      NA      NA      NA      NA      NA      NA      NA      NA   NA
+AOAA 0.00212      NA      NA      NA      NA      NA      NA      NA      NA   NA
+FALU 0.00210 0.00213      NA      NA      NA      NA      NA      NA      NA   NA
+FASA 0.00210 0.00211 0.00210      NA      NA      NA      NA      NA      NA   NA
+FTEL 0.00209 0.00210 0.00209 0.00209      NA      NA      NA      NA      NA   NA
+LEON 0.00209 0.00211 0.00209 0.00209 0.00208      NA      NA      NA      NA   NA
+MALO 0.00209 0.00210 0.00210 0.00207 0.00206 0.00208      NA      NA      NA   NA
+VATI 0.00211 0.00212 0.00211 0.00207 0.00209 0.00210 0.00209      NA      NA   NA
+OFU3 0.00216 0.00217 0.00216 0.00216 0.00214 0.00215 0.00216 0.00217      NA   NA
+OFU6 0.00213 0.00216 0.00213 0.00213 0.00212 0.00212 0.00213 0.00214 0.00213   NA
+```
+
+<br>
+
+Visualize as heatmap:
+```r
+# convert back to long format
+dxy_heatmap_df <- dxy_matrix_lower %>%
+  as.data.frame() %>%
+  rownames_to_column("pop1") %>%
+  pivot_longer(
+    cols = -pop1,
+    names_to = "pop2",
+    values_to = "dxy"
+  ) %>%
+  mutate(
+    pop1 = factor(pop1, levels = new_order),
+    pop2 = factor(pop2, levels = new_order)
+  )
+
+# plot heatmap!
+ggplot(dxy_heatmap_df, aes(x = pop2, y = pop1, fill = dxy)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = ifelse(is.na(dxy), "", sprintf("%.5f", dxy))), size = 3) +
+  scale_fill_viridis_c(na.value = "white") +
+  scale_y_discrete(limits = rev(levels(dxy_heatmap_df$pop1))) +
+  coord_fixed() +
+  labs(
+    x = NULL,
+    y = NULL,
+    fill = "Dxy"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+```
+![alt text](image-91.png)
+
+<br>
+
+```r
+mean_pairwise_dxy <- mean(dxy_sum_location$pooled_dxy)
+
+
+mean_pairwise_dxy_tutuila <- dxy_sum_location %>% 
+  filter(!str_detect(comparison, "OFU")) %>% 
+  pull(pooled_dxy) %>% 
+  mean()
+
+```
+Mean pairwise pooled dxy between all locations = 0.00211439136208461
+
+Mean pairwise pooled dxy between Tutila locations = 0.00209592103758804
+
+<br>
+
+```r
+# replot distribution with mean pairwise dxy between all locations
+ggplot(dxy_location_filt, aes(x = avg_dxy)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean_pairwise_dxy, linetype = "dashed") +
+  labs(
+    x = "avg_dxy (Mean per-site Dxy across 10 kb window)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-92.png)
+
+<br>
+
+```r
+# facet by chromosome (using mean_pairwise_dxy as x-intercept for reference)
+ggplot(dxy_location_filt, aes(x = avg_dxy)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean_pairwise_dxy, linetype = "dashed") +
+  facet_grid(~ chromosome) +
+  labs(
+    x = "avg_dxy (Mean per-site Dxy across 10 kb window)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-93.png)
+
+<br>
+
+```r
+# plot "average" per-window dxy across genome
+# calculate pooled dxy (across location comparisons) for each window
+dxy_window_sum_location <- dxy_location_filt %>% 
+  group_by(chromosome, window_pos_1) %>%
+  summarise(
+    pooled_dxy = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pooling is more accurate
+    mean_dxy = mean(avg_dxy, na.rm = TRUE),
+    var_dxy  = var(avg_dxy, na.rm = TRUE),
+    max_dxy  = max(avg_dxy, na.rm = TRUE),
+    n_pairs  = n(),
+    .groups = "drop"
+  )
+
+# plot pooled dxy
+ggplot(dxy_window_sum_location, aes(x = window_pos_1, y = pooled_dxy)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Pooled dxy across location pairs"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-94.png)
+
+<br>
+
+```r
+# plot variance
+ggplot(dxy_window_sum_location, aes(x = window_pos_1, y = var_dxy)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Pooled dxy across location pairs"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-95.png)
+
+<br>
+
+```r
+# plot max dxy
+ggplot(dxy_window_sum_location, aes(x = window_pos_1, y = max_dxy)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Pooled dxy across location pairs"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-96.png)
+
+<br>
+
+```r
+# plot all three as tracks
+# transform into one long format
+dxy_window_sum_long <- dxy_window_sum_location %>%
+  select(chromosome, window_pos_1, pooled_dxy, var_dxy, max_dxy) %>%
+  pivot_longer(
+    cols = c(pooled_dxy, var_dxy, max_dxy),
+    names_to = "metric",
+    values_to = "value"
+  ) %>% 
+  mutate(metric = as.factor(metric))
+
+# reorder so pooled dxy is on top
+dxy_window_sum_long$metric <- factor(
+  dxy_window_sum_long$metric,
+  levels = c("pooled_dxy", "var_dxy", "max_dxy")
+)
+
+# plot tracks
+ggplot(dxy_window_sum_long, aes(x = window_pos_1, y = value)) +
+  geom_point(alpha = 0.3, size = 0.4) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.4) +
+  facet_grid(metric ~ chromosome, scales = "free", switch = "y") +
+  labs(
+    x = "Genomic position",
+    y = NULL
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.placement = "outside",
+    strip.background = element_blank()
+  )
+```
+![alt text](image-97.png)
+
+<br>
+<br>
+
+#### Now Fst
+
+```r
+# Load in files
+fst_location_files <- list.files(
+  "./location/",
+  pattern = "_fst.txt$",
+  full.names = TRUE
+)
+
+# name the vector for use in .id column in next step
+names(fst_location_files) <- fst_location_files
+
+# import and combine location fst files while creating new column with file path/name
+fst_location_raw <- map_dfr(fst_location_files, read_tsv, .id = "source_file")
+
+#reformatting
+fst_location <- fst_location_raw %>%
+  mutate(
+    chromosome = str_remove(chromosome, "_Pverrucosa$") %>% as.factor(),
+    pop1 = as.factor(pop1),
+    pop2 = as.factor(pop2),
+    comparison = as.factor(paste(pop1, pop2, sep = "_"))
+  )
+
+str(fst_location)
+```
+```
+tibble [1,136,160 × 9] (S3: tbl_df/tbl/data.frame)
+ $ source_file   : chr [1:1136160] "./location//NC_089312.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" ...
+ $ pop1          : Factor w/ 9 levels "ALOF","AOAA",..: 1 1 1 1 1 5 5 5 5 6 ...
+ $ pop2          : Factor w/ 9 levels "AOAA","FALU",..: 1 2 3 4 5 6 7 8 9 6 ...
+ $ chromosome    : Factor w/ 18 levels "NC_089312.1",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ window_pos_1  : num [1:1136160] 30001 30001 30001 30001 30001 ...
+ $ window_pos_2  : num [1:1136160] 40000 40000 40000 40000 40000 40000 40000 40000 40000 40000 ...
+ $ avg_hudson_fst: num [1:1136160] 0.00276 0.01294 0.11625 0.17629 -0.01482 ...
+ $ no_snps       : num [1:1136160] 15 15 15 15 15 15 15 15 15 15 ...
+ $ comparison    : Factor w/ 45 levels "ALOF_AOAA","ALOF_FALU",..: 1 2 3 4 5 32 33 34 35 36 ...
+```
+
+<br>
+
+```r
+
+```
