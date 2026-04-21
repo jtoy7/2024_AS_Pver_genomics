@@ -4068,27 +4068,26 @@ ggplot(dxy_location_filt, aes(x = avg_dxy)) +
 dxy_window_sum_location <- dxy_location_filt %>% 
   group_by(chromosome, window_pos_1) %>%
   summarise(
-    pooled_dxy = sum(count_diffs, na.rm = TRUE) / sum(count_comparisons, na.rm = TRUE), # pooling is more accurate
-    mean_dxy = mean(avg_dxy, na.rm = TRUE),
+    mean_dxy = mean(avg_dxy, na.rm = TRUE),  # mean_dxy treats each location-pair comparison equally, which is what we are interested in here
     var_dxy  = var(avg_dxy, na.rm = TRUE),
     max_dxy  = max(avg_dxy, na.rm = TRUE),
     n_pairs  = n(),
     .groups = "drop"
   )
 
-# plot pooled dxy
-ggplot(dxy_window_sum_location, aes(x = window_pos_1, y = pooled_dxy)) +
+# plot mean dxy
+ggplot(dxy_window_sum_location, aes(x = window_pos_1, y = mean_dxy)) +
   geom_point(alpha = 0.3, size = 0.5) +
   geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
   facet_wrap(~ chromosome, scales = "free_x") +
   labs(
     x = "Genomic position",
-    y = "Pooled dxy across location pairs"
+    y = "Mean dxy across location pairs"
   ) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
-![alt text](image-94.png)
+![alt text](image-111.png)
 
 <br>
 
@@ -4100,12 +4099,12 @@ ggplot(dxy_window_sum_location, aes(x = window_pos_1, y = var_dxy)) +
   facet_wrap(~ chromosome, scales = "free_x") +
   labs(
     x = "Genomic position",
-    y = "Pooled dxy across location pairs"
+    y = "Variance in dxy across location pairs"
   ) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
-![alt text](image-95.png)
+![alt text](image-98.png)
 
 <br>
 
@@ -4117,12 +4116,12 @@ ggplot(dxy_window_sum_location, aes(x = window_pos_1, y = max_dxy)) +
   facet_wrap(~ chromosome, scales = "free_x") +
   labs(
     x = "Genomic position",
-    y = "Pooled dxy across location pairs"
+    y = "Max dxy across location pairs"
   ) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
-![alt text](image-96.png)
+![alt text](image-99.png)
 
 <br>
 
@@ -4130,9 +4129,9 @@ ggplot(dxy_window_sum_location, aes(x = window_pos_1, y = max_dxy)) +
 # plot all three as tracks
 # transform into one long format
 dxy_window_sum_long <- dxy_window_sum_location %>%
-  select(chromosome, window_pos_1, pooled_dxy, var_dxy, max_dxy) %>%
+  select(chromosome, window_pos_1, mean_dxy, var_dxy, max_dxy) %>%
   pivot_longer(
-    cols = c(pooled_dxy, var_dxy, max_dxy),
+    cols = c(mean_dxy, var_dxy, max_dxy),
     names_to = "metric",
     values_to = "value"
   ) %>% 
@@ -4141,7 +4140,7 @@ dxy_window_sum_long <- dxy_window_sum_location %>%
 # reorder so pooled dxy is on top
 dxy_window_sum_long$metric <- factor(
   dxy_window_sum_long$metric,
-  levels = c("pooled_dxy", "var_dxy", "max_dxy")
+  levels = c("mean_dxy", "var_dxy", "max_dxy")
 )
 
 # plot tracks
@@ -4160,7 +4159,7 @@ ggplot(dxy_window_sum_long, aes(x = window_pos_1, y = value)) +
     strip.background = element_blank()
   )
 ```
-![alt text](image-97.png)
+![alt text](image-112.png)
 
 <br>
 <br>
@@ -4208,5 +4207,478 @@ tibble [1,136,160 × 9] (S3: tbl_df/tbl/data.frame)
 <br>
 
 ```r
+# plot distribution of SNPs per 10kb window (no_sites is not included in pixy output for Fst)
+ggplot(fst_location, aes(x = no_snps)) +
+  geom_histogram(bins = 50) +
+  labs(
+    x = "Number of SNPs per 10 kb window",
+    y = "Number of windows"
+  ) +
+  scale_x_continuous(breaks = seq(from=0, to = 800, by = 100)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# log-scaled x-axis version for better visual clarity at low SNP numbers
+ggplot(fst_location, aes(x = no_snps)) +
+  geom_histogram() +
+  labs(
+    x = "Number of SNPs per 10 kb window (log scale)",
+    y = "Number of windows"
+  ) +
+  scale_x_log10() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-100.png)
+![alt text](image-101.png)
+
+<br>
+
+```r
+# summarize remaining windows if we filter for windows with at least 10 SNPs
+fst_location %>%
+  summarise(
+    total = n(),
+    retained = sum(no_snps >= 10),
+    prop = retained / total
+  )
+
+# sensitivity check: try other cutoffs to see how it changes number of retained windows
+fst_location %>%
+  summarise(
+    prop_05 = mean(no_snps >= 5),
+    prop_10 = mean(no_snps >= 10),
+    prop_20 = mean(no_snps >= 20),
+    prop_30 = mean(no_snps >= 30)
+  )
+```
+```
+    total retained  prop
+  1136160   968580 0.853
+
+  prop_05 prop_10 prop_20 prop_30
+    0.905   0.853   0.776   0.711
+```
+This means we could use a cutoff value of >= 10 SNPs, but this leaves 968,580 windows which is more than the 763,245 windows kept for dxy (after filtering for no_sites >= 7000), so Fst and Dxy would not be directly comparable.
+
+<br>
+
+Instead, let's use the same windows we kept for the Dxy analysis:
+```r
+keep_windows_location <- dxy_location %>%
+  filter(no_sites >= 7000) %>%
+  select(chromosome, window_pos_1, window_pos_2, comparison)
+
+fst_location_filt <- fst_location %>%
+  inner_join(keep_windows_location, by = c("chromosome", "window_pos_1", "window_pos_2", "comparison"))
+
+# summarize remaining windows after keeping sites used in dxy analysis
+nrow(fst_location)
+nrow(fst_location_filt)
+nrow(fst_location_filt)/nrow(fst_location)
+
+nrow(dxy_location_filt) - nrow(fst_location_filt)
+```
+```
+> nrow(fst_location)
+[1] 1136160
+> nrow(fst_location_filt)
+[1] 760995
+> nrow(fst_location_filt)/nrow(fst_location)
+[1] 0.669795627376426
+> nrow(dxy_location_filt) - nrow(fst_location_filt)
+[1] 2250
+```
+So only 2250 windows are missing (across all pairwise location comparisons) that did not have enough polymorphism to calculate Fst but were included in the dxy analysis.
+
+<br>
+
+Now filter based on low SNP number (low SNP number creates unreliable Fst estimates):
+```r
+fst_location_filt_snpfilt <- fst_location_filt %>% 
+  filter(no_snps >= 10) %>% 
+  filter(!is.na(avg_hudson_fst))  # also remove the 5 rows that remain with NAs for Fst values
+                                  # (These can occur if the SNPs in the window are variable in the full dataset,
+                                  # but not variable/informative for that specific population pair)
+
+nrow(fst_location_filt_snpfilt)
+nrow(fst_location_filt) - nrow(fst_location_filt_snpfilt)
+```
+```
+> nrow(fst_location_filt_snpfilt)
+[1] 745465
+> nrow(fst_location_filt) - nrow(fst_location_filt_snpfilt)
+[1] 15530
+```
+This removes an additional 15,530 windows.
+
+<br>
+
+```r
+# plot distribution of average fst across filtered 10kb windows
+ggplot(fst_location_filt_snpfilt, aes(x = avg_hudson_fst)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  labs(
+    x = "avg_hudson_fst (Mean per-site Hudson's Fst across SNPs in 10 kb window)",
+    y = "Number of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-102.png)
+Actually looks somewhat different from distribution for island-level comparison. Peak is at zero.
+
+<br>
+
+```r
+# calculate full summary stats for genome-wide Fst between locations
+fst_sum_location <- fst_location_filt_snpfilt %>% 
+  group_by(comparison) %>% 
+  summarise(
+    w_mean = weighted.mean(avg_hudson_fst, no_snps),  # pixy output doesn't give separate numerator and denominator values, so pooling isn't possible. Next best option is mean weighted by no_snps in window.
+    median = median(avg_hudson_fst),
+    sd = sd(avg_hudson_fst),
+    q05 = quantile(avg_hudson_fst, 0.05),
+    q95 = quantile(avg_hudson_fst, 0.95)
+  ) %>% 
+  arrange(desc(w_mean))
+```
+```
+# A tibble: 45 × 6
+   comparison w_mean median     sd      q05   q95
+   <fct>       <dbl>  <dbl>  <dbl>    <dbl> <dbl>
+ 1 OFU3_VATI  0.0540 0.0425 0.0547 -0.00996 0.159
+ 2 MALO_OFU3  0.0503 0.0385 0.0594 -0.0186  0.163
+ 3 FTEL_OFU3  0.0497 0.0394 0.0474 -0.00443 0.142
+ 4 FASA_OFU3  0.0497 0.0378 0.0618 -0.0224  0.168
+ 5 AOAA_OFU3  0.0414 0.0318 0.0502 -0.0153  0.140
+ 6 ALOF_OFU3  0.0407 0.0317 0.0461 -0.0119  0.130
+ 7 LEON_OFU3  0.0396 0.0308 0.0475 -0.0131  0.131
+ 8 FALU_OFU3  0.0367 0.0272 0.0455 -0.0131  0.127
+ 9 FTEL_VATI  0.0333 0.0245 0.0395 -0.0130  0.109
+10 FASA_FTEL  0.0297 0.0193 0.0475 -0.0247  0.119
+# ℹ 35 more rows
+```
+
+<br>
+
+```r
+# convert to matrix for easier visualization
+pop_order <- c("ALOF","AOAA","FALU","FASA","FTEL","LEON","MALO","OFU3","OFU6","VATI")
+
+fst_matrix <- fst_sum_location %>%
+  separate(comparison, into = c("pop1", "pop2"), sep = "_") %>%  # split comparison back into pop1 and pop2
+  select(pop1, pop2, w_mean) %>%
+  mutate(pop1 = factor(pop1, levels = pop_order)) %>%
+  pivot_wider(names_from = pop2, values_from = w_mean) %>%  # cast to matrix format
+  arrange(pop1) %>% 
+  select(pop1, all_of(pop_order[-1])) %>%   # reorder columns to match row order
+  column_to_rownames("pop1") %>%
+  as.matrix() %>% 
+  t() %>% 
+  round(5)
+
+fst_matrix
+```
+```
+        ALOF    AOAA    FALU    FASA    FTEL    LEON    MALO    OFU3    OFU6
+AOAA 0.01439      NA      NA      NA      NA      NA      NA      NA      NA
+FALU 0.00906 0.01461      NA      NA      NA      NA      NA      NA      NA
+FASA 0.02178 0.01804 0.01793      NA      NA      NA      NA      NA      NA
+FTEL 0.02223 0.01920 0.02082 0.02966      NA      NA      NA      NA      NA
+LEON 0.01224 0.01386 0.00640 0.01751 0.01983      NA      NA      NA      NA
+MALO 0.01738 0.01620 0.01762 0.01732 0.01981 0.01565      NA      NA      NA
+OFU3 0.04070 0.04143 0.03668 0.04970 0.04972 0.03956 0.05030      NA      NA
+OFU6 0.01308 0.01788 0.00935 0.02134 0.02379 0.01240 0.02229 0.01437      NA
+VATI 0.02768 0.02488 0.02365 0.01647 0.03329 0.02344 0.02475 0.05398 0.02722
+```
+
+<br>
+
+```r
+# fill out full symmetrical matrix to enable reorder of locations
+
+# original pairwise dataframe
+fst_pairs <- fst_sum_location %>%
+  separate(comparison, into = c("pop1", "pop2"), sep = "_") %>%
+  select(pop1, pop2, w_mean)
+
+# reversed copy to bind
+fst_pairs_rev <- fst_pairs %>%
+  rename(new_pop1 = pop2, new_pop2 = pop1) %>% 
+  rename(pop1 = new_pop1, pop2 = new_pop2)
+
+# bind together and convert to full matrix
+fst_matrix_full <- bind_rows(fst_pairs, fst_pairs_rev) %>% 
+  mutate(
+    pop1 = factor(pop1, levels = pop_order),
+    pop2 = factor(pop2, levels = pop_order)
+  ) %>%
+  pivot_wider(
+    names_from = pop2,
+    values_from = w_mean,
+    names_expand = TRUE
+  ) %>%
+  arrange(pop1) %>%
+  select(pop1, all_of(pop_order)) %>%
+  column_to_rownames("pop1") %>%
+  as.matrix() %>%
+  round(5)
+
+
+# now reorder locations by island
+new_order <- c("ALOF","AOAA","FALU","FASA","FTEL","LEON","MALO","VATI","OFU3","OFU6")
+
+fst_matrix_full_reordered <- fst_matrix_full[new_order, new_order]
+
+
+# trim to lower triangle only
+fst_matrix_lower <- fst_matrix_full_reordered
+fst_matrix_lower[upper.tri(fst_matrix_lower, diag = TRUE)] <- NA
+fst_matrix_lower
+
+# also create upper triangle in case I want it later
+fst_matrix_upper <- fst_matrix_full_reordered
+fst_matrix_upper[lower.tri(fst_matrix_upper, diag = TRUE)] <- NA
+```
+```
+> fst_matrix_lower
+        ALOF    AOAA    FALU    FASA    FTEL    LEON    MALO    VATI    OFU3 OFU6
+ALOF      NA      NA      NA      NA      NA      NA      NA      NA      NA   NA
+AOAA 0.01439      NA      NA      NA      NA      NA      NA      NA      NA   NA
+FALU 0.00906 0.01461      NA      NA      NA      NA      NA      NA      NA   NA
+FASA 0.02178 0.01804 0.01793      NA      NA      NA      NA      NA      NA   NA
+FTEL 0.02223 0.01920 0.02082 0.02966      NA      NA      NA      NA      NA   NA
+LEON 0.01224 0.01386 0.00640 0.01751 0.01983      NA      NA      NA      NA   NA
+MALO 0.01738 0.01620 0.01762 0.01732 0.01981 0.01565      NA      NA      NA   NA
+VATI 0.02768 0.02488 0.02365 0.01647 0.03329 0.02344 0.02475      NA      NA   NA
+OFU3 0.04070 0.04143 0.03668 0.04970 0.04972 0.03956 0.05030 0.05398      NA   NA
+OFU6 0.01308 0.01788 0.00935 0.02134 0.02379 0.01240 0.02229 0.02722 0.01437   NA
+```
+
+<br>
+
+Visualize as heatmap:
+```r
+# convert back to long format
+fst_heatmap_df <- fst_matrix_lower %>%
+  as.data.frame() %>%
+  rownames_to_column("pop1") %>%
+  pivot_longer(
+    cols = -pop1,
+    names_to = "pop2",
+    values_to = "fst"
+  ) %>%
+  mutate(
+    pop1 = factor(pop1, levels = new_order),
+    pop2 = factor(pop2, levels = new_order)
+  )
+
+# plot heatmap!
+ggplot(fst_heatmap_df, aes(x = pop2, y = pop1, fill = fst)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = ifelse(is.na(fst), "", sprintf("%.5f", fst))), size = 3) +
+  scale_fill_viridis_c(na.value = "white") +
+  scale_y_discrete(limits = rev(levels(fst_heatmap_df$pop1))) +
+  coord_fixed() +
+  labs(
+    x = NULL,
+    y = NULL,
+    fill = "Fst"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+```
+![alt text](image-103.png)
+
+<br>
+
+```r
+# calculate mean pairwise Fst across all comparisons
+mean_pairwise_fst <- mean(fst_sum_location$w_mean)
+
+# excluding Ofu locations
+mean_pairwise_fst_tutuila <- fst_sum_location %>% 
+  filter(!str_detect(comparison, "OFU")) %>% 
+  pull(w_mean) %>% 
+  mean()
+```
+```
+> mean_pairwise_fst
+[1] 0.0235434697957818
+
+> mean_pairwise_fst_tutuila
+[1] 0.0191314855098116
+```
+
+<br>
+
+```r
+# replot distribution with mean pairwise fst between all locations
+ggplot(fst_location_filt_snpfilt, aes(x = avg_hudson_fst)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean_pairwise_fst, linetype = "dashed") +
+  labs(
+    x = "avg_hudson_fst (Mean per-site Hudson's Fst across SNPs in 10 kb window)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw()
+```
+![alt text](image-104.png)
+
+<br>
+
+```r
+# facet by chromosome (using mean_pairwise_dxy as x-intercept for reference)
+ggplot(fst_location_filt_snpfilt, aes(x = avg_hudson_fst)) +
+  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
+  geom_vline(xintercept = mean_pairwise_fst, linetype = "dashed") +
+  facet_grid(~ chromosome) +
+  labs(
+    x = "avg_hudson_fst (Mean per-site Hudson's Fst across SNPs in 10 kb window)",
+    y = "Count of 10 kb windows"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-105.png)
+
+<br>
+
+```r
+# calculate mean pairwise fst for each location across all comparisons
+mean_pairwise_fst_by_location <- tibble(
+  pop = new_order,
+  mean_pairwise_fst = map_dbl(new_order, function(loc) {
+    fst_sum_location %>% 
+      filter(str_detect(comparison, loc)) %>% 
+      pull(w_mean) %>% 
+      mean(na.rm = TRUE)
+  }
+  )
+)
+
+mean_pairwise_fst_by_location %>% arrange(desc(mean_pairwise_fst))
+```
+```
+   pop   mean_pairwise_fst
+ 1 OFU3             0.0418
+ 2 VATI             0.0284
+ 3 FTEL             0.0265
+ 4 FASA             0.0233
+ 5 MALO             0.0224
+ 6 AOAA             0.0201
+ 7 ALOF             0.0198
+ 8 OFU6             0.0180
+ 9 LEON             0.0179
+10 FALU             0.0173
+```
+So the difference between Ofu and Tutuila is really driven by the differentiation of OFU3 location. OFU6 is not very divergent from other sites (mean Fst actually less than the overall mean pairwise Fst across all comparisons), but it is important to note that OFU6 has the lowest sample size of any location.
+
+<br>
+
+```r
+# plot "average" per-window fst across genome
+# calculate weighted mean fst (across location comparisons) for each window
+fst_window_sum_location <- fst_location_filt_snpfilt %>% 
+  group_by(chromosome, window_pos_1) %>%
+  summarise(
+    mean_fst = mean(avg_hudson_fst, na.rm = TRUE),
+    var_fst  = var(avg_hudson_fst, na.rm = TRUE),
+    max_fst  = max(avg_hudson_fst, na.rm = TRUE),
+    n_pairs  = n(),
+    .groups = "drop"
+  )
+
+# plot weighted mean
+ggplot(fst_window_sum_location, aes(x = window_pos_1, y = mean_fst)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Mean Fst across location pairs"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
+![alt text](image-107.png)
+
+<br>
+
+```r
+# plot variance
+ggplot(fst_window_sum_location, aes(x = window_pos_1, y = var_fst)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Variance in Fst across location pairs"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-108.png)
+
+<br>
+
+```r
+# plot max fst
+ggplot(fst_window_sum_location, aes(x = window_pos_1, y = max_fst)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Max Fst across location pairs"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-109.png)
+
+<br>
+
+```r
+# plot all three as tracks
+# transform into one long format
+fst_window_sum_long <- fst_window_sum_location %>%
+  select(chromosome, window_pos_1, mean_fst, var_fst, max_fst) %>%
+  pivot_longer(
+    cols = c(mean_fst, var_fst, max_fst),
+    names_to = "metric",
+    values_to = "value"
+  ) %>% 
+  mutate(metric = as.factor(metric))
+
+# reorder so mean_fst is on top
+fst_window_sum_long$metric <- factor(
+  fst_window_sum_long$metric,
+  levels = c("mean_fst", "var_fst", "max_fst")
+)
+
+# plot tracks
+ggplot(fst_window_sum_long, aes(x = window_pos_1, y = value)) +
+  geom_point(alpha = 0.3, size = 0.4) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.4) +
+  facet_grid(metric ~ chromosome, scales = "free", switch = "y") +
+  labs(
+    x = "Genomic position",
+    y = NULL
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.placement = "outside",
+    strip.background = element_blank()
+  )
+```
+![alt text](image-110.png)
+
+
+
+
