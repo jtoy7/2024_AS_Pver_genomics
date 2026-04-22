@@ -4592,7 +4592,7 @@ fst_window_sum_location <- fst_location_filt_snpfilt %>%
     .groups = "drop"
   )
 
-# plot weighted mean
+# plot mean
 ggplot(fst_window_sum_location, aes(x = window_pos_1, y = mean_fst)) +
   geom_point(alpha = 0.3, size = 0.5) +
   geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
@@ -4678,6 +4678,118 @@ ggplot(fst_window_sum_long, aes(x = window_pos_1, y = value)) +
   )
 ```
 ![alt text](image-110.png)
+
+
+#### Now let's zoom in on the OFU3 vs. OFU6 comparison specifically 
+```r
+ofu_comp <- fst_location_filt_snpfilt %>% 
+  filter(str_detect(comparison, "OFU\\d_OFU\\d"))
+
+
+# plot Fst per window across the genome for the OFU3/OFU6 comparison
+ggplot(ofu_comp, aes(x = window_pos_1, y = avg_hudson_fst)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Average Hudson Fst"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-113.png)
+Some notable peaks among otherwise low baseline divergence.
+
+<br>
+
+```r
+# summarize genome-wide weighted Fst for this comparison
+ofu_fst_summary <- ofu_comp %>%
+  summarise(
+    w_mean = weighted.mean(avg_hudson_fst, no_snps, na.rm = TRUE),
+    median = median(avg_hudson_fst, na.rm = TRUE),
+    q95 = quantile(avg_hudson_fst, 0.95, na.rm = TRUE),
+    q99 = quantile(avg_hudson_fst, 0.99, na.rm = TRUE),
+    max = max(avg_hudson_fst, na.rm = TRUE),
+    n_windows = n()
+  )
+
+ofu_fst_summary
+```
+```
+  w_mean  median   q95   q99   max n_windows
+  0.0144 0.00395 0.103 0.169 0.566     16566
+```
+
+<br>
+
+```r
+# identify outliers based on 99th percentile or 99.9th percentile
+ofu_fst_outliers_q99 <- ofu_comp %>%
+  mutate(
+    fst_q99 = quantile(avg_hudson_fst, 0.99, na.rm = TRUE),
+    window_id = paste(chromosome, window_pos_1, window_pos_2, sep = "_") # make unique window identifier
+  ) %>%
+  filter(avg_hudson_fst >= fst_q99) %>%
+  arrange(desc(avg_hudson_fst))
+
+ofu_fst_outliers_q999 <- ofu_comp %>%
+  mutate(
+    fst_q999 = quantile(avg_hudson_fst, 0.999, na.rm = TRUE),
+    window_id = paste(chromosome, window_pos_1, window_pos_2, sep = "_") # madke unique window identifier
+  ) %>%
+  filter(avg_hudson_fst >= fst_q999) %>%
+  arrange(desc(avg_hudson_fst))
+```
+
+```r
+str(ofu_fst_outliers_q99)
+```
+```
+tibble [166 × 11] (S3: tbl_df/tbl/data.frame)
+ $ source_file   : chr [1:166] "./location//NC_089313.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" ...
+ $ pop1          : Factor w/ 9 levels "ALOF","AOAA",..: 8 8 8 8 8 8 8 8 8 8 ...
+ $ pop2          : Factor w/ 9 levels "AOAA","FALU",..: 8 8 8 8 8 8 8 8 8 8 ...
+ $ chromosome    : Factor w/ 27 levels "NC_089312.1",..: 2 1 1 1 4 4 4 1 4 4 ...
+ $ window_pos_1  : num [1:166] 3680001 34690001 34680001 34700001 21220001 ...
+ $ window_pos_2  : num [1:166] 3690000 34700000 34690000 34710000 21230000 ...
+ $ avg_hudson_fst: num [1:166] 0.566 0.521 0.506 0.486 0.404 ...
+ $ no_snps       : num [1:166] 32 67 70 47 30 59 118 93 65 117 ...
+ $ comparison    : Factor w/ 45 levels "ALOF_AOAA","ALOF_FALU",..: 43 43 43 43 43 43 43 43 43 43 ...
+ $ fst_q99       : Named num [1:166] 0.169 0.169 0.169 0.169 0.169 ...
+  ..- attr(*, "names")= chr [1:166] "99%" "99%" "99%" "99%" ...
+ $ window_id     : chr [1:166] "NC_089313.1_3680001_3690000" "NC_089312.1_34690001_34700000" "NC_089312.1_34680001_34690000" "NC_089312.1_34700001_34710000" ...
+```
+
+<br>
+
+```r
+str(ofu_fst_outliers_q999)
+```
+```
+tibble [17 × 11] (S3: tbl_df/tbl/data.frame)
+ $ source_file   : chr [1:17] "./location//NC_089313.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" "./location//NC_089312.1_Pverrucosa.location_fst.txt" ...
+ $ pop1          : Factor w/ 9 levels "ALOF","AOAA",..: 8 8 8 8 8 8 8 8 8 8 ...
+ $ pop2          : Factor w/ 9 levels "AOAA","FALU",..: 8 8 8 8 8 8 8 8 8 8 ...
+ $ chromosome    : Factor w/ 27 levels "NC_089312.1",..: 2 1 1 1 4 4 4 1 4 4 ...
+ $ window_pos_1  : num [1:17] 3680001 34690001 34680001 34700001 21220001 ...
+ $ window_pos_2  : num [1:17] 3690000 34700000 34690000 34710000 21230000 ...
+ $ avg_hudson_fst: num [1:17] 0.566 0.521 0.506 0.486 0.404 ...
+ $ no_snps       : num [1:17] 32 67 70 47 30 59 118 93 65 117 ...
+ $ comparison    : Factor w/ 45 levels "ALOF_AOAA","ALOF_FALU",..: 43 43 43 43 43 43 43 43 43 43 ...
+ $ fst_q999      : Named num [1:17] 0.271 0.271 0.271 0.271 0.271 ...
+  ..- attr(*, "names")= chr [1:17] "99.9%" "99.9%" "99.9%" "99.9%" ...
+ $ window_id     : chr [1:17] "NC_089313.1_3680001_3690000" "NC_089312.1_34690001_34700000" "NC_089312.1_34680001_34690000" "NC_089312.1_34700001_34710000" ...
+```
+The q99 and q999 "outliers" consist of 166 and 17 windows, respectively.
+
+<br>
+
+
+
+
+
 
 
 
