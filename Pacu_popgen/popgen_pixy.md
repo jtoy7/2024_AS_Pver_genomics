@@ -5030,7 +5030,7 @@ plot_grid(p7_q99, p4_q99, p5_q99, p6_q99, nrow = 2)
 Interpretation:
 - <u>Fst vs. dxy</u> - highest Fst windows are mostly at low to moderate Dxy, not concentrated at the extreme highest Dxy values. If there were deep absolute divergence between the two sites in these windows (e.g., from prolonged isolation, restricted gene flow), we'd expect to see outlier windows with high Fst and high Dxy. We don't see that here.
 - <u>Fst vs. tajima_d_OFU3</u> - highest Fst windows skewed slightly negative as in the full dataset, but there are both positive and negative values. If elevated Fst were being driven by a selective sweep/directional selection in OFU3, we'd expect strongly negative tajima's D values for the outlier windows. Again, we have a mixed bag here.
-- <u>Fst vs. tajima_d_OFU6</u> - full dataset and outliers both skewed negative compared to the OFU3 distribution, indicating more interesting demographic or selection dynamics at this location, but the low sample size for OFU6 necessitates some caution. Shouldn't read too much into it.
+- <u>Fst vs. tajima_d_OFU6</u> - full dataset and outliers both skewed even more negative compared to the OFU3 distribution, indicating more interesting demographic or selection dynamics at this location, but the low sample size for OFU6 necessitates some caution. Shouldn't read too much into it.
 - <u>Fst vs. delta_td</u> - full dataset and outliers both skewed positive (Tajima's D greater in OFU3 than OFU6). Together with the positive-skewed delta_pi, this would actually be more indicative of directional selection in OFU6 than OFU3, but again, the lower sample size of OFU6 (n=7) compared to OFU3 (n=17) suggests caution in reading too much into this.
 
 
@@ -5132,6 +5132,11 @@ p7_q999 <- ggplot() +
 plot_grid(p0_q999, p1_q999, p2_q999, p3_q999, nrow = 2)
 ```
 ![alt text](image-120.png)
+Interpretation:
+- <u>Fst vs. no_snps</u> - The q999 set is enriched for lower-SNP windows relative to q99, so the most extreme tail may be more sensitive to stochasticity; however, not all q999 windows are low-SNP.
+- <u>Fst vs. pi_OFU3</u> - Similar trend as with SNP number - remaining outlier windows at q999 are predominantly lower pi windows (<0.002). Only 4 outlier windows have moderate pi (>0.002). This greater skew toward low pi is consistent with signatures of selection in these windows, but could also be a result of other factors like low SNP count.
+- <u>Fst vs. pi_OFU6</u> - similar to pi for OFU3, but less skewed toward low pi.
+- <u>Fst vs. delta_pi</u> - outlier windows are still both positive and negative, and pretty evenly split. It is interesting to note, however, that 3 of the 4 greatest outlier windows have lower pi in OFU3 than OFU6. If these high-FST windows were being driven by OFU3-specific selective sweeps, this is what we would expect (delta_pi < 0).
 
 <br>
 
@@ -5139,8 +5144,13 @@ plot_grid(p0_q999, p1_q999, p2_q999, p3_q999, nrow = 2)
 plot_grid(p7_q999, p4_q999, p5_q999, p6_q999, nrow = 2)
 ```
 ![alt text](image-121.png)
+Interpretation:
+- <u>Fst vs. dxy</u> - Not much change from q99 outlier set. The highest Fst windows are still fairly evenly spread at low to moderate Dxy, not concentrated at the extreme highest Dxy values.
+- <u>Fst vs. tajima_d_OFU3</u> - Outliers pretty evenly split between positive and negative Tajima's D. But interesting to note that 3 of the 4 highest Fst windows have fairly negative Tajima's D (-1 to -2). Again, if elevated Fst in these 3 windows were being driven by a selective sweep/directional selection in OFU3, this is what we'd expect.
+- <u>Fst vs. tajima_d_OFU6</u> - full dataset and outliers both still skewed more negative compared to the OFU3 distribution. The 3 Fst outlier windows mentioned above with fairly negative D in OFU3 are fairly close to 0 in OFU6 (-1 to +1).
+- <u>Fst vs. delta_td</u> - Fst outlier windows are no longer skewed positive. 7 are negative and 10 positive. The 3 outlier windows mentioned above are all fairly negative (delta_D < -1), again consistent with OFU3-driven selection.
 
-
+Synthesis: The q999 outlier set remains heterogeneous overall and does not show elevated Dxy, so it does not support a genome-wide pattern of deep divergence or a uniform OFU3-selection signature. However, **3 of the top 4 FST windows stand out as stronger OFU3-specific candidate regions** because they combine very high FST with lower OFU3 π, more negative OFU3 Tajima’s D, and non-elevated Dxy.
 
 
 
