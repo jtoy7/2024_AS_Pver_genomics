@@ -5150,7 +5150,7 @@ Interpretation:
 - <u>Fst vs. tajima_d_OFU6</u> - full dataset and outliers both still skewed more negative compared to the OFU3 distribution. The 3 Fst outlier windows mentioned above with fairly negative D in OFU3 are fairly close to 0 in OFU6 (-1 to +1).
 - <u>Fst vs. delta_td</u> - Fst outlier windows are no longer skewed positive. 7 are negative and 10 positive. The 3 outlier windows mentioned above are all fairly negative (delta_D < -1), again consistent with OFU3-driven selection.
 
-Synthesis: The q999 outlier set remains heterogeneous overall and does not show elevated Dxy, so it does not support a genome-wide pattern of deep divergence or a uniform OFU3-selection signature. However, **3 of the top 4 FST windows stand out as stronger OFU3-specific candidate regions** because they combine very high FST with lower OFU3 π, more negative OFU3 Tajima’s D, and non-elevated Dxy.
+**Synthesis**: The q999 outlier set remains heterogeneous overall and does not show elevated Dxy, so it does not support a genome-wide pattern of deep divergence or a uniform OFU3-selection signature. However, **3 of the top 4 FST windows stand out as stronger OFU3-specific candidate regions** because they combine very high FST with lower OFU3 π, more negative OFU3 Tajima’s D, and non-elevated Dxy.
 
 
 
