@@ -4786,9 +4786,359 @@ The q99 and q999 "outliers" consist of 166 and 17 windows, respectively.
 
 <br>
 
+```r
+# plot these cutoffs on the genome-wide Fst plot
+q99 <- quantile(ofu_comp$avg_hudson_fst, 0.99, na.rm = TRUE)
+q999 <- quantile(ofu_comp$avg_hudson_fst, 0.999, na.rm = TRUE)
+```
+```
+> q99
+              99% 
+0.168517564203822 
+> q999
+            99.9% 
+0.270558441438258 
+```
+Fst 99th and 99.9th percentile cutoffs are 0.169 and 0.271, respectively.
+
+<br>
+
+```r
+# plot Fst per window across the genome for the OFU3/OFU6 comparison
+ggplot(ofu_comp, aes(x = window_pos_1, y = avg_hudson_fst)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_smooth(span = 0.1, color = "red", linewidth = 0.5) +
+  geom_hline(yintercept = q99, color = "darkblue", linetype = "dashed", linewidth = 0.5) +
+  geom_hline(yintercept = q999, color = "lightblue", linetype = "dashed", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x") +
+  labs(
+    x = "Genomic position",
+    y = "Average Hudson Fst"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![alt text](image-114.png)
+
+<br>
+
+```r
+# check if outliers are robust to SNP count
+ggplot(ofu_comp, aes(x = no_snps, y = avg_hudson_fst)) +
+  geom_point(alpha = 0.3, size = 0.6) +
+  geom_smooth(method = "lm", se = TRUE) +
+  geom_hline(yintercept = q99, color = "darkblue", linetype = "dashed", linewidth = 0.5) +
+  geom_hline(yintercept = q999, color = "lightblue", linetype = "dashed", linewidth = 0.5) +
+  labs(
+    x = "Number of SNPs per window",
+    y = "Hudson Fst"
+  ) +
+  theme_bw()
+  ```
+  ![alt text](image-115.png)
+The windows with the highest Fst tend to have fewer SNPs, but most still seem to have a reasonable amount (10-300).
+
+<br>
+
+```r
+# Combine metrics for outlier windows into one dataframe to plot metrics against each other
+# first subset out relevant Ofu data into individual dataframes
+ofu3_pi <- pi_location_filt %>% 
+  mutate(
+    window_id = paste(chromosome, window_pos_1, window_pos_2, sep = "_")
+    ) %>% 
+  filter(pop == "OFU3")
+
+ofu6_pi <- pi_location_filt %>% 
+  mutate(
+    window_id = paste(chromosome, window_pos_1, window_pos_2, sep = "_")
+  ) %>% 
+  filter(pop == "OFU6")
 
 
+ofu36_dxy <- dxy_location_filt %>% 
+  mutate(
+    window_id = paste(chromosome, window_pos_1, window_pos_2, sep = "_")
+  ) %>% 
+  filter(str_detect(comparison, "OFU\\d_OFU\\d"))
 
+
+ofu3_tajimad <- tajimad_location_filt %>% 
+  mutate(
+    window_id = paste(chromosome, window_pos_1, window_pos_2, sep = "_")
+  ) %>% 
+  filter(pop == "OFU3")
+
+ofu6_tajimad <- tajimad_location_filt %>% 
+  mutate(
+    window_id = paste(chromosome, window_pos_1, window_pos_2, sep = "_")
+  ) %>% 
+  filter(pop == "OFU6")
+  ```
+
+  <br>
+
+```r
+# then combine with fst outlier dataframe
+q99_outlier_all_metrics <- ofu_fst_outliers_q99 %>% 
+  select(pop1, pop2, chromosome, window_pos_1, window_pos_2, window_id, comparison, no_snps, avg_hudson_fst) %>% 
+  left_join(ofu3_pi %>% 
+              select(window_id, avg_pi, no_sites) %>% 
+              rename(avg_pi_OFU3 = avg_pi, 
+                     no_sites_pi_OFU3 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu6_pi %>% 
+              select(window_id, avg_pi, no_sites) %>% 
+              rename(avg_pi_OFU6 = avg_pi, 
+                     no_sites_pi_OFU6 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu36_dxy %>% 
+              select(window_id, avg_dxy, no_sites) %>% 
+              rename(no_sites_dxy = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu3_tajimad %>% 
+              select(window_id, tajima_d, no_sites) %>% 
+              rename(tajima_d_OFU3 = tajima_d, 
+                     no_sites_tajimad_OFU3 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu6_tajimad %>% 
+              select(window_id, tajima_d, no_sites) %>% 
+              rename(tajima_d_OFU6 = tajima_d, 
+                     no_sites_tajimad_OFU6 = no_sites),
+            by = "window_id") %>% 
+  mutate(delta_pi = avg_pi_OFU3 - avg_pi_OFU6) %>% 
+  mutate(delta_td = tajima_d_OFU3 - tajima_d_OFU6)
+  ```
+
+  <br>
+
+  ```r
+  # repeat for all windows as reference set
+ofu36_all_metrics <- ofu_comp %>%
+  mutate(
+    window_id = paste(chromosome, window_pos_1, window_pos_2, sep = "_") # make unique window identifier
+  ) %>%
+  arrange(desc(avg_hudson_fst))%>% 
+  select(pop1, pop2, chromosome, window_pos_1, window_pos_2, window_id, comparison, no_snps, avg_hudson_fst) %>% 
+  left_join(ofu3_pi %>% 
+              select(window_id, avg_pi, no_sites) %>% 
+              rename(avg_pi_OFU3 = avg_pi, 
+                     no_sites_pi_OFU3 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu6_pi %>% 
+              select(window_id, avg_pi, no_sites) %>% 
+              rename(avg_pi_OFU6 = avg_pi, 
+                     no_sites_pi_OFU6 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu36_dxy %>% 
+              select(window_id, avg_dxy, no_sites) %>% 
+              rename(no_sites_dxy = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu3_tajimad %>% 
+              select(window_id, tajima_d, no_sites) %>% 
+              rename(tajima_d_OFU3 = tajima_d, 
+                     no_sites_tajimad_OFU3 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu6_tajimad %>% 
+              select(window_id, tajima_d, no_sites) %>% 
+              rename(tajima_d_OFU6 = tajima_d, 
+                     no_sites_tajimad_OFU6 = no_sites),
+            by = "window_id") %>% 
+  mutate(delta_pi = avg_pi_OFU3 - avg_pi_OFU6) %>% 
+  mutate(delta_td = tajima_d_OFU3 - tajima_d_OFU6)
+  ```
+
+  <br>
+
+  ```r
+# plot metrics for q99 set over full window set
+
+# fst vs no_snps
+p0_q99 <- ggplot() +
+  geom_point(data = ofu36_all_metrics, aes(x = no_snps, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q99_outlier_all_metrics, aes(x = no_snps, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs OFU3 pi
+p1_q99 <- ggplot() +
+  geom_point(data = ofu36_all_metrics, aes(x = avg_pi_OFU3, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q99_outlier_all_metrics, aes(x = avg_pi_OFU3, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs OFU6 pi
+p2_q99 <- ggplot() +
+  geom_point(data = ofu36_all_metrics, aes(x = avg_pi_OFU6, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q99_outlier_all_metrics, aes(x = avg_pi_OFU6, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs delta_pi
+p3_q99 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(data = ofu36_all_metrics, aes(x = delta_pi, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q99_outlier_all_metrics, aes(x = delta_pi, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs OFU3 tajimad
+p4_q99 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(data = ofu36_all_metrics, aes(x = tajima_d_OFU3, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q99_outlier_all_metrics, aes(x = tajima_d_OFU3, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs OFU6 tajimad
+p5_q99 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(data = ofu36_all_metrics, aes(x = tajima_d_OFU6, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q99_outlier_all_metrics, aes(x = tajima_d_OFU6, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs delta_tajimad
+p6_q99 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(data = ofu36_all_metrics, aes(x = delta_td, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q99_outlier_all_metrics, aes(x = delta_td, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs dxy
+p7_q99 <- ggplot() +
+  geom_point(data = ofu36_all_metrics, aes(x = avg_dxy, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q99_outlier_all_metrics, aes(x = avg_dxy, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+```
+
+<br>
+
+```r
+plot_grid(p0_q99, p1_q99, p2_q99, p3_q99, nrow = 2)
+```
+![alt text](image-122.png)
+
+Interpretation:
+- <u>Fst vs. no_snps</u> - highest Fst windows have lower SNP counts, but overall outliers are pretty evenly spread across SNP count range.
+- <u>Fst vs. pi_OFU3</u> - mixed bag; some outliers have reduced nucleotide diversity, but no general trend towards low pi that you would expect if there was a strong selective sweep driving Fst outliers. Outlier windows have mostly low-moderate pi, and none fall among the highest-pi windows.
+- <u>Fst vs. pi_OFU6</u> - similar to pi for OFU3; mixed bag.
+- <u>Fst vs. delta_pi</u> - outlier windows are both positive and negative, with maybe slightly more positive (OFU3 pi > OF6 pi), so elevated Fst is not being driven by reductions in diversity in one site or another. If high-FST windows were mainly being driven by OFU3-specific selective sweeps, we would expect most of them to have lower pi in OFU3 than OFU6 (delta_pi < 0).
+
+
+<br>
+
+```r
+plot_grid(p7_q99, p4_q99, p5_q99, p6_q99, nrow = 2)
+```
+![alt text](image-123.png)
+
+Interpretation:
+- <u>Fst vs. dxy</u> - highest Fst windows are mostly at low to moderate Dxy, not concentrated at the extreme highest Dxy values. If there were deep absolute divergence between the two sites in these windows (e.g., from prolonged isolation, restricted gene flow), we'd expect to see outlier windows with high Fst and high Dxy. We don't see that here.
+- <u>Fst vs. tajima_d_OFU3</u> - highest Fst windows skewed slightly negative as in the full dataset, but there are both positive and negative values. If elevated Fst were being driven by a selective sweep/directional selection in OFU3, we'd expect strongly negative tajima's D values for the outlier windows. Again, we have a mixed bag here.
+- <u>Fst vs. tajima_d_OFU6</u> - full dataset and outliers both skewed negative compared to the OFU3 distribution, indicating more interesting demographic or selection dynamics at this location, but the low sample size for OFU6 necessitates some caution. Shouldn't read too much into it.
+- <u>Fst vs. </u> - full dataset and outliers both skewed positive (Tajima's D greater in OFU3 than OFU6). Together with the positive-skewed delta_pi, this would actually be more indicative of directional selection in OFU6 than OFU3, but again, the lower sample size of OFU6 (n=7) compared to OFU3 (n=17) suggests caution in reading too much into this.
+
+
+<br>
+
+```r
+# Repeat for q999 set
+q999_outlier_all_metrics <- ofu_fst_outliers_q999 %>% 
+  select(pop1, pop2, chromosome, window_pos_1, window_pos_2, window_id, comparison, no_snps, avg_hudson_fst) %>% 
+  left_join(ofu3_pi %>% 
+              select(window_id, avg_pi, no_sites) %>% 
+              rename(avg_pi_OFU3 = avg_pi, 
+                     no_sites_pi_OFU3 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu6_pi %>% 
+              select(window_id, avg_pi, no_sites) %>% 
+              rename(avg_pi_OFU6 = avg_pi, 
+                     no_sites_pi_OFU6 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu36_dxy %>% 
+              select(window_id, avg_dxy, no_sites) %>% 
+              rename(no_sites_dxy = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu3_tajimad %>% 
+              select(window_id, tajima_d, no_sites) %>% 
+              rename(tajima_d_OFU3 = tajima_d, 
+                     no_sites_tajimad_OFU3 = no_sites),
+            by = "window_id") %>% 
+  left_join(ofu6_tajimad %>% 
+              select(window_id, tajima_d, no_sites) %>% 
+              rename(tajima_d_OFU6 = tajima_d, 
+                     no_sites_tajimad_OFU6 = no_sites),
+            by = "window_id") %>% 
+  mutate(delta_pi = avg_pi_OFU3 - avg_pi_OFU6) %>% 
+  mutate(delta_td = tajima_d_OFU3 - tajima_d_OFU6)
+```
+
+<br>
+
+```r
+# plot metrics for q999 set over full window set
+
+# fst vs no_snps
+p0_q999 <- ggplot() +
+  geom_point(data = ofu36_all_metrics, aes(x = no_snps, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q999_outlier_all_metrics, aes(x = no_snps, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs OFU3 pi
+p1_q999 <- ggplot() +
+  geom_point(data = ofu36_all_metrics, aes(x = avg_pi_OFU3, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q999_outlier_all_metrics, aes(x = avg_pi_OFU3, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs OFU6 pi
+p2_q999 <- ggplot() +
+  geom_point(data = ofu36_all_metrics, aes(x = avg_pi_OFU6, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q999_outlier_all_metrics, aes(x = avg_pi_OFU6, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs delta_pi
+p3_q999 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(data = ofu36_all_metrics, aes(x = delta_pi, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q999_outlier_all_metrics, aes(x = delta_pi, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs OFU3 tajimad
+p4_q999 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(data = ofu36_all_metrics, aes(x = tajima_d_OFU3, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q999_outlier_all_metrics, aes(x = tajima_d_OFU3, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs OFU6 tajimad
+p5_q999 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(data = ofu36_all_metrics, aes(x = tajima_d_OFU6, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q999_outlier_all_metrics, aes(x = tajima_d_OFU6, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs delta_tajimad
+p6_q999 <- ggplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point(data = ofu36_all_metrics, aes(x = delta_td, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q999_outlier_all_metrics, aes(x = delta_td, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+
+# fst vs dxy
+p7_q999 <- ggplot() +
+  geom_point(data = ofu36_all_metrics, aes(x = avg_dxy, y = avg_hudson_fst), alpha = 0.5) +
+  geom_point(data = q999_outlier_all_metrics, aes(x = avg_dxy, y = avg_hudson_fst), color = "red") +
+  theme_bw()
+```
+
+<br>
+
+```r
+plot_grid(p0_q999, p1_q999, p2_q999, p3_q999, nrow = 2)
+```
+![alt text](image-120.png)
+
+<br>
+
+```r
+plot_grid(p7_q999, p4_q999, p5_q999, p6_q999, nrow = 2)
+```
+![alt text](image-121.png)
 
 
 
