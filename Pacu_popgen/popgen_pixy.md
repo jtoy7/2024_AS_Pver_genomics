@@ -5031,7 +5031,7 @@ Interpretation:
 - <u>Fst vs. dxy</u> - highest Fst windows are mostly at low to moderate Dxy, not concentrated at the extreme highest Dxy values. If there were deep absolute divergence between the two sites in these windows (e.g., from prolonged isolation, restricted gene flow), we'd expect to see outlier windows with high Fst and high Dxy. We don't see that here.
 - <u>Fst vs. tajima_d_OFU3</u> - highest Fst windows skewed slightly negative as in the full dataset, but there are both positive and negative values. If elevated Fst were being driven by a selective sweep/directional selection in OFU3, we'd expect strongly negative tajima's D values for the outlier windows. Again, we have a mixed bag here.
 - <u>Fst vs. tajima_d_OFU6</u> - full dataset and outliers both skewed negative compared to the OFU3 distribution, indicating more interesting demographic or selection dynamics at this location, but the low sample size for OFU6 necessitates some caution. Shouldn't read too much into it.
-- <u>Fst vs. </u> - full dataset and outliers both skewed positive (Tajima's D greater in OFU3 than OFU6). Together with the positive-skewed delta_pi, this would actually be more indicative of directional selection in OFU6 than OFU3, but again, the lower sample size of OFU6 (n=7) compared to OFU3 (n=17) suggests caution in reading too much into this.
+- <u>Fst vs. delta_td</u> - full dataset and outliers both skewed positive (Tajima's D greater in OFU3 than OFU6). Together with the positive-skewed delta_pi, this would actually be more indicative of directional selection in OFU6 than OFU3, but again, the lower sample size of OFU6 (n=7) compared to OFU3 (n=17) suggests caution in reading too much into this.
 
 
 <br>
