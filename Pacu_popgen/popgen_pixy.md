@@ -5262,3 +5262,14 @@ plot_grid(cand_reg_fst + labs(x = NULL),
           )
 ```
 ![alt text](image-124.png)
+
+<br>
+Rough summary of OFU3 and OFU6:
+
+<br>
+
+OFU3 appears to be the more strongly filtered and differentiated of the two Ofu pools. Relative to Tutuila, it shows the clearest shift in allele frequencies, with the highest mean pairwise FST and elevated Dxy, but it does not stand out as especially diversity-rich within site; instead, its comparatively low θ and only moderate π are more consistent with a narrower subset of variants being retained under the extreme conditions of Pool 300. At the same time, the data do not support a strong genome-wide selective sweep or broad genome-wide directional selection at OFU3. Rather, most of the genome still fits a shallow-divergence, shared-variation background, while a limited number of localized windows stand out as candidate regions of stronger divergence, including a small cluster of adjacent high-FST windows between OFU3 and OFU6. Taken together, this suggests that OFU3 is best interpreted as a locally distinctive population shaped by environmental filtering and selection at particular parts of the genome, rather than by genome-wide isolation.
+
+<br>
+
+OFU6 shows the opposite pattern. It has the highest π and θ and the most negative Tajima’s D of all locations, indicating unusually high standing variation together with an excess of rare alleles, yet it remains only weakly differentiated from Tutuila by FST even though OFU6–Tutuila Dxy is often higher than among Tutuila-only comparisons. Accordingly, OFU6 looks less like an independently diverged population and more like a diversity-retaining population that remains connected to the broader regional gene pool. One plausible explanation is that OFU6 receives shared propagules from Tutuila while also exchanging alleles with nearby OFU3; in that scenario, OFU3-associated alleles may contribute to elevated absolute divergence in OFU6 without driving the same strong relative differentiation, because those alleles are not sorted or filtered in OFU6 to the same extent. OFU6 shows little evidence for strong genome-wide directional selection, and the dominant pattern is instead one of elevated standing variation and rare alleles.
