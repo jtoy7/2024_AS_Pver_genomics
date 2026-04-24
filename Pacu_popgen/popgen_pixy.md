@@ -5154,19 +5154,111 @@ Interpretation:
 
 <br>
 
-Checking these three candidate regions, it actually turns out they are **consecutive adjacent windows**. In other words, they represent a 30kb region of extreme Fst, negative delta_pi, and negative delta_D. This strengthens their candidacy as a OFU3-driven sweep region even more.
+Checking these three candidate regions, it actually turns out they are **consecutive adjacent windows**, and there is actually a **fourth** consecutive window that is also in the q999 outlier set. In other words, these windows represent a 40kb region of extreme Fst, negative delta_pi, and negative delta_D. This strengthens their candidacy as an OFU3-driven sweep region even more:
+```r
+# 3 of the top 4 FST outlier windows are good candidates for regions under selection because they show extreme Fst, but also non-elevated dxy, negative delta_pi, and negative delta_td
+
+# Take a closer look at these 3 windows:
+ofu_fst_outliers_q999 %>% select(comparison, chromosome, window_pos_1, window_pos_2, window_id, avg_hudson_fst, no_snps)
+```
+```
+   comparison chromosome  window_pos_1 window_pos_2 window_id                     avg_hudson_fst no_snps
+   <fct>      <fct>              <dbl>        <dbl> <chr>                                  <dbl>   <dbl>
+ 1 OFU3_OFU6  NC_089313.1      3680001      3690000 NC_089313.1_3680001_3690000            0.566      32
+ 2 OFU3_OFU6  NC_089312.1     34690001     34700000 NC_089312.1_34690001_34700000          0.521      67
+ 3 OFU3_OFU6  NC_089312.1     34680001     34690000 NC_089312.1_34680001_34690000          0.506      70
+ 4 OFU3_OFU6  NC_089312.1     34700001     34710000 NC_089312.1_34700001_34710000          0.486      47
+ 5 OFU3_OFU6  NC_089315.1     21220001     21230000 NC_089315.1_21220001_21230000          0.404      30
+ 6 OFU3_OFU6  NC_089315.1     21190001     21200000 NC_089315.1_21190001_21200000          0.387      59
+ 7 OFU3_OFU6  NC_089315.1     21610001     21620000 NC_089315.1_21610001_21620000          0.339     118
+ 8 OFU3_OFU6  NC_089312.1     34710001     34720000 NC_089312.1_34710001_34720000          0.332      93
+ 9 OFU3_OFU6  NC_089315.1      1740001      1750000 NC_089315.1_1740001_1750000            0.326      65
+10 OFU3_OFU6  NC_089315.1     21600001     21610000 NC_089315.1_21600001_21610000          0.315     117
+11 OFU3_OFU6  NC_089315.1     21230001     21240000 NC_089315.1_21230001_21240000          0.312     135
+12 OFU3_OFU6  NC_089315.1     24370001     24380000 NC_089315.1_24370001_24380000          0.298      37
+13 OFU3_OFU6  NC_089324.1     12810001     12820000 NC_089324.1_12810001_12820000          0.288      46
+14 OFU3_OFU6  NC_089313.1     17880001     17890000 NC_089313.1_17880001_17890000          0.280      53
+15 OFU3_OFU6  NC_089312.1     36050001     36060000 NC_089312.1_36050001_36060000          0.276      24
+16 OFU3_OFU6  NC_089315.1     24380001     24390000 NC_089315.1_24380001_24390000          0.271      96
+17 OFU3_OFU6  NC_089318.1     24190001     24200000 NC_089318.1_24190001_24200000          0.271     100
+```
+
+```r
+# These three windows are consecutive on chromosome NC_089312! And there is actually a **fourth** consecutive window that is not in the top 5, but still in the q999 dataset!
+
+# Let's take a closer look at this 40kb region
+ofu_fst_outliers_q999 %>% 
+  select(comparison, chromosome, window_pos_1, window_pos_2, window_id, avg_hudson_fst, no_snps) %>% 
+  filter(chromosome == "NC_089312.1")
+```
 ```
   comparison chromosome  window_pos_1 window_pos_2 window_id                     avg_hudson_fst no_snps
-  OFU3_OFU6  NC_089312.1     34690001     34700000 NC_089312.1_34690001_34700000          0.521      67
-  OFU3_OFU6  NC_089312.1     34680001     34690000 NC_089312.1_34680001_34690000          0.506      70
-  OFU3_OFU6  NC_089312.1     34700001     34710000 NC_089312.1_34700001_34710000          0.486      47
+  <fct>      <fct>              <dbl>        <dbl> <chr>                                  <dbl>   <dbl>
+1 OFU3_OFU6  NC_089312.1     34690001     34700000 NC_089312.1_34690001_34700000          0.521      67
+2 OFU3_OFU6  NC_089312.1     34680001     34690000 NC_089312.1_34680001_34690000          0.506      70
+3 OFU3_OFU6  NC_089312.1     34700001     34710000 NC_089312.1_34700001_34710000          0.486      47
+4 OFU3_OFU6  NC_089312.1     34710001     34720000 NC_089312.1_34710001_34720000          0.332      93
+5 OFU3_OFU6  NC_089312.1     36050001     36060000 NC_089312.1_36050001_36060000          0.276      24
 ```
-
 <br>
 
-Here's that chromosome again on it's own, with the region highlighted:
-```
+Let's plot that chromosome again on it's own, with the candidate region highlighted:
+```r
+# create new column that indicates the 4 candidate windows
+cand_windows <- ofu36_all_metrics %>% 
+  mutate(
+    candidate = chromosome == "NC_089312.1" &
+      window_pos_1 %in% c(34680001, 34690001, 34700001, 34710001)
+  ) %>% 
+  filter(chromosome == "NC_089312.1")
+
+# plot fst
+cand_reg_fst <- ggplot(cand_windows, aes(x = window_pos_1/1e6, y = avg_hudson_fst)) +
+  geom_point(data = cand_windows %>% filter(!candidate), color = "black", alpha = 0.3, size = 1.5) +
+  geom_point(data = cand_windows %>% filter(candidate), color = "red", alpha = 1, size = 1.5) +
+  geom_hline(yintercept = q999, color = "steelblue", linetype = "dashed", linewidth = 0.5) +
+  facet_wrap(~ chromosome, scales = "free_x", nrow = 2) +
+  labs(
+    x = "Genomic position (Mbp)",
+    y = "Average Hudson Fst"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# plot delta_pi
+cand_reg_deltapi <- ggplot(cand_windows, aes(x = window_pos_1/1e6, y = delta_pi)) +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed", linewidth = 0.5) +
+  geom_point(data = cand_windows %>% filter(!candidate), color = "black", alpha = 0.3, size = 1.5) +
+  geom_point(data = cand_windows %>% filter(candidate), color = "red", alpha = 1, size = 1.5) +
+  facet_wrap(~ chromosome, scales = "free_x", nrow = 2) +
+  labs(
+    x = "Genomic position (Mbp)",
+    y = "Δπ"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# plot delta_td
+cand_reg_deltatd <- ggplot(cand_windows, aes(x = window_pos_1/1e6, y = delta_td)) +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed", linewidth = 0.5) +
+  geom_point(data = cand_windows %>% filter(!candidate), color = "black", alpha = 0.3, size = 1.5) +
+  geom_point(data = cand_windows %>% filter(candidate), color = "red", alpha = 1, size = 1.5) +
+  facet_wrap(~ chromosome, scales = "free_x", nrow = 2) +
+  labs(
+    x = "Genomic position (Mbp)",
+    y = "Δ Tajima's D"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
+# combine plots
+plot_grid(cand_reg_fst + labs(x = NULL),
+          cand_reg_deltapi + labs(x = NULL),
+          cand_reg_deltatd,
+          ncol = 1,
+          align = "v",
+          axis = "lr"
+          )
 ```
 ![alt text](image-124.png)
