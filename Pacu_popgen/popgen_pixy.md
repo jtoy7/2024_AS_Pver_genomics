@@ -5273,3 +5273,12 @@ OFU3 appears to be the more strongly filtered and differentiated of the two Ofu 
 <br>
 
 OFU6 shows the opposite pattern. It has the highest π and θ and the most negative Tajima’s D of all locations, indicating unusually high standing variation together with an excess of rare alleles, yet it remains only weakly differentiated from Tutuila by FST even though OFU6–Tutuila Dxy is often higher than among Tutuila-only comparisons. Accordingly, OFU6 looks less like an independently diverged population and more like a diversity-retaining population that remains connected to the broader regional gene pool. One plausible explanation is that OFU6 receives shared propagules from Tutuila while also exchanging alleles with nearby OFU3; in that scenario, OFU3-associated alleles may contribute to elevated absolute divergence in OFU6 without driving the same strong relative differentiation, because those alleles are not sorted or filtered in OFU6 to the same extent. OFU6 shows little evidence for strong genome-wide directional selection, and the dominant pattern is instead one of elevated standing variation and rare alleles.
+
+<br>
+
+General summary across all popgen results:
+- π is similar across islands/sites → no major genome-wide loss of diversity
+- Dxy ≈ π and low FST → shallow divergence/shared variation/gene flow
+- Ofu has higher θ and more negative Tajima’s D, indicating rare-allele enrichment / nonequilibrium dynamics
+- FTEL has lower θ and more neutral Tajima’s D, indicating potentially more stable/differentiated genomic background
+- differentiation is weak but nonzero → enough structure to matter, not enough to imply isolation
