@@ -5152,5 +5152,21 @@ Interpretation:
 
 **Synthesis**: The q999 outlier set remains heterogeneous overall and does not show elevated Dxy, so it does not support a genome-wide pattern of deep divergence or a uniform OFU3-selection signature. However, **3 of the top 4 FST windows stand out as stronger OFU3-specific candidate regions** because they combine very high FST with lower OFU3 π, more negative OFU3 Tajima’s D, and non-elevated Dxy.
 
+<br>
+
+Checking these three candidate regions, it actually turns out they are **consecutive adjacent windows**. In other words, they represent a 30kb region of extreme Fst, negative delta_pi, and negative delta_D. This strengthens their candidacy as a OFU3-driven sweep region even more.
+```
+  comparison chromosome  window_pos_1 window_pos_2 window_id                     avg_hudson_fst no_snps
+  OFU3_OFU6  NC_089312.1     34690001     34700000 NC_089312.1_34690001_34700000          0.521      67
+  OFU3_OFU6  NC_089312.1     34680001     34690000 NC_089312.1_34680001_34690000          0.506      70
+  OFU3_OFU6  NC_089312.1     34700001     34710000 NC_089312.1_34700001_34710000          0.486      47
+```
+
+<br>
+
+Here's that chromosome again on it's own, with the region highlighted:
+```
 
 
+```
+![alt text](image-124.png)
